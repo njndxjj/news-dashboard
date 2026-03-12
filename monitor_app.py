@@ -24,7 +24,8 @@ from database import (
     get_push_rules, save_push_rule, update_push_rule, delete_push_rule,
     get_push_logs, get_setting, update_setting, get_all_settings,
     get_news_count, get_latest_published, save_push_log, get_news_by_channel,
-    get_user_interests, record_user_click, get_user_click_history, get_personalized_news
+    get_user_interests, record_user_click, get_user_click_history, get_personalized_news,
+    PRESET_INTEREST_CATEGORIES, add_user_interest, get_db_connection
 )
 from feishu_push import (
     send_feishu_message, format_single_news_card, format_breaking_news_batch,
@@ -288,8 +289,11 @@ def fallback_analysis(news_list):
 
     top_industries = industry_count.most_common(3)
 
+    # 计算平均热度（处理 hot_score 为 None 的情况）
+    avg_hot_score = sum((n.get('hot_score') or 50) for n in news_list) / total
+
     return {
-        "executive_summary": f"本次共分析 {total} 条新闻，平均热度 {sum(n.get('hot_score', 0) for n in news_list)/total:.1f} 分。正面舆情 {positive/total*100:.1f}%，负面舆情 {negative/total*100:.1f}%。",
+        "executive_summary": f"本次共分析 {total} 条新闻，平均热度 {avg_hot_score:.1f} 分。正面舆情 {positive/total*100:.1f}%，负面舆情 {negative/total*100:.1f}%。",
         "sentiment_analysis": {
             "overall": "positive" if positive > negative else "negative" if negative > positive else "neutral",
             "positive_rate": round(positive / total, 2),
@@ -613,6 +617,10 @@ def get_news_by_channel_route():
     return jsonify(news_by_channel)
 
 
+# 预设兴趣分类从 database.py 导入
+# PRESET_INTEREST_CATEGORIES = {}
+
+
 @app.route('/api/user/interests', methods=['GET'])
 def api_get_user_interests():
     """获取用户兴趣标签"""
@@ -621,34 +629,99 @@ def api_get_user_interests():
     return jsonify({'interests': interests})
 
 
-@app.route('/api/user/click', methods=['POST'])
-def api_record_user_click():
-    """记录用户点击行为"""
+@app.route('/api/user/interests/categories', methods=['GET'])
+def api_get_interest_categories():
+    """获取预设兴趣分类"""
+    return jsonify({'categories': PRESET_INTEREST_CATEGORIES})
+
+
+@app.route('/api/user/interests', methods=['POST'])
+def api_add_user_interest():
+    """添加用户兴趣标签（用于领域选择）"""
     data = request.get_json()
     if not data:
         return jsonify({'error': '无效请求'}), 400
 
     user_id = data.get('user_id', 'default')
-    news_id = data.get('news_id')
-    title = data.get('title')
-    source = data.get('source')
+    keyword = data.get('keyword')
+    weight = data.get('weight', 1.0)
 
-    if not news_id or not title:
-        return jsonify({'error': '缺少必要参数'}), 400
+    if not keyword:
+        return jsonify({'error': '缺少关键词'}), 400
 
-    record_user_click(user_id, news_id, title, source)
+    add_user_interest(user_id, keyword, weight)
+    return jsonify({'success': True, 'keyword': keyword})
+
+
+@app.route('/api/user/interests/follow_category', methods=['POST'])
+def api_follow_category():
+    """用户关注某个分类（自动添加该分类下所有关键词）"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    user_id = data.get('user_id', 'default')
+    category = data.get('category')
+
+    if not category or category not in PRESET_INTEREST_CATEGORIES:
+        return jsonify({'error': '无效分类'}), 400
+
+    # 添加该分类下所有关键词到用户兴趣
+    keywords = PRESET_INTEREST_CATEGORIES[category]
+    for keyword in keywords:
+        add_user_interest(user_id, keyword, weight=1.0)
+
+    return jsonify({'success': True, 'category': category, 'keywords_count': len(keywords)})
+
+
+@app.route('/api/user/interests/unfollow_category', methods=['POST'])
+def api_unfollow_category():
+    """用户取消关注某个分类（移除该分类下所有关键词）"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    user_id = data.get('user_id', 'default')
+    category = data.get('category')
+
+    if not category or category not in PRESET_INTEREST_CATEGORIES:
+        return jsonify({'error': '无效分类'}), 400
+
+    # 删除该分类下所有关键词
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    keywords = PRESET_INTEREST_CATEGORIES[category]
+    for keyword in keywords:
+        cursor.execute('DELETE FROM user_interests WHERE user_id = ? AND keyword = ?', (user_id, keyword))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'category': category})
+
+
+@app.route('/api/user/interests/delete', methods=['POST'])
+def api_delete_user_interest():
+    """删除用户兴趣标签（用于取消关注领域）"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    user_id = data.get('user_id', 'default')
+    keyword = data.get('keyword')
+
+    if not keyword:
+        return jsonify({'error': '缺少关键词'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM user_interests WHERE user_id = ? AND keyword = ?', (user_id, keyword))
+    conn.commit()
+    conn.close()
+
     return jsonify({'success': True})
 
 
-@app.route('/api/user/click-history', methods=['GET'])
-def api_get_user_click_history():
-    """获取用户点击历史"""
-    user_id = request.args.get('user_id', 'default')
-    limit = request.args.get('limit', 50, type=int)
-    history = get_user_click_history(user_id, limit)
-    return jsonify({'history': history})
-
-@app.route('/api/refresh', methods=['POST'])
+@app.route('/api/user/click', methods=['POST'])
 def refresh_news():
     """手动刷新新闻数据"""
     fetch_all_news()
@@ -676,6 +749,26 @@ def search_news():
     keywords = query.split()
     news = get_news_by_keywords(keywords, limit=100)
     return jsonify(news)
+
+
+@app.route('/api/user/click', methods=['POST'])
+def api_record_user_click():
+    """记录用户点击行为"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    user_id = data.get('user_id', 'default')
+    news_id = data.get('news_id')
+    title = data.get('title')
+    source = data.get('source')
+
+    if not news_id or not title:
+        return jsonify({'error': '缺少必要参数'}), 400
+
+    record_user_click(user_id, news_id, title, source)
+    return jsonify({'success': True})
+
 
 @app.route('/api/stats')
 def get_stats():
@@ -818,8 +911,10 @@ def recommend_news():
 
         recommendations.append({
             'title': news.get('title', ''),
+            'link': news.get('link', '#'),
             'score': f'{item["score"]:.0%}',
-            'reason': reason
+            'reason': reason,
+            'matched_keywords': item['matched_keywords']
         })
 
     return jsonify({'recommendations': recommendations})
@@ -827,24 +922,49 @@ def recommend_news():
 
 @app.route('/api/analyze/social', methods=['POST'])
 def analyze_social():
-    """社交分析接口"""
+    """社交分析接口 - 改进版"""
     data = request.get_json()
     news_list = data.get('news', [])
 
     if not news_list:
         return jsonify({'metrics': {}, 'trends': []})
 
-    # 简单的社交指标计算（实际应用中应接入真实社交 API）
     total_count = len(news_list)
 
-    # 模拟社交互动数据
-    total_engagement = total_count * 150  # 假设每条新闻平均 150 次互动
-    viral_count = sum(1 for n in news_list if (n.get('hot_score') or 0) > 80)
-    sentiment_scores = {'positive': 1, 'neutral': 0.5, 'negative': 0}
-    avg_sentiment = sum(sentiment_scores.get(n.get('sentiment', 'neutral'), 0.5) for n in news_list) / total_count if total_count > 0 else 0.5
-    trend_velocity = viral_count * 2.5
+    # 改进的社交指标计算 - 基于热度和时间新鲜度
+    total_engagement = 0
+    viral_count = 0
+    sentiment_sum = 0
+    hot_topics = []
 
-    # 社交趋势
+    for news in news_list:
+        hot_score = news.get('hot_score') or 50
+        sentiment = news.get('sentiment', 'neutral')
+
+        # 根据热度分数估算互动量（热度越高互动越多）
+        engagement = int(hot_score * 2.5)  # 热度 100 对应 250 互动
+        total_engagement += engagement
+
+        # 高热内容（>75）认为具有病毒传播潜力
+        if hot_score > 75:
+            viral_count += 1
+            hot_topics.append({
+                'topic': news.get('title', '')[:20],
+                'engagement': engagement,
+                'hot_score': hot_score
+            })
+
+        # 情感计分
+        sentiment_scores = {'positive': 1, 'neutral': 0.5, 'negative': 0}
+        sentiment_sum += sentiment_scores.get(sentiment, 0.5)
+
+    # 计算平均值
+    avg_sentiment = sentiment_sum / total_count if total_count > 0 else 0.5
+    # 传播速度基于病毒内容数量和平均热度
+    avg_hot_score = sum(n.get('hot_score') or 50 for n in news_list) / total_count if total_count > 0 else 50
+    trend_velocity = (viral_count * 3.5) + (avg_hot_score / 10)
+
+    # 从标题中提取热门话题
     all_titles = ' '.join([n['title'] for n in news_list])
     words = re.findall(r'[\u4e00-\u9fff]{2,}|[A-Za-z]{2,}', all_titles)
     stopwords = ['的', '了', '是', '在', '和', '与', '等', '个', '这', '那', '就', '都']
@@ -853,18 +973,24 @@ def analyze_social():
     from collections import Counter
     word_freq = Counter(filtered_words)
     trends = [
-        {'topic': kw, 'engagement': count * 50}
-        for kw, count in word_freq.most_common(3)
+        {'topic': kw, 'engagement': count * 80, 'hot_score': count * 10}
+        for kw, count in word_freq.most_common(5)
     ]
+
+    # 按互动数排序病毒内容
+    hot_topics.sort(key=lambda x: x['hot_score'], reverse=True)
+    top_viral = hot_topics[:3]
 
     return jsonify({
         'metrics': {
             'total_engagement': total_engagement,
             'viral_count': viral_count,
             'sentiment_score': f'{avg_sentiment:.2f}',
-            'trend_velocity': f'{trend_velocity:.1f}'
+            'trend_velocity': f'{trend_velocity:.1f}',
+            'avg_hot_score': f'{avg_hot_score:.1f}'
         },
-        'trends': trends
+        'trends': trends,
+        'viral_topics': top_viral
     })
 
 def format_ai_analysis_html(analysis, total_count):
@@ -923,8 +1049,22 @@ def format_key_drivers(drivers):
 def format_trend_insights(insights):
     if not insights:
         return ''
-    items = ''
+
+    # 过滤掉没有实际内容的条目
+    valid_insights = []
     for insight in insights:
+        trend = insight.get('trend', '').strip()
+        evidence = insight.get('evidence', '').strip()
+        impact = insight.get('impact', '').strip()
+        # 至少要有 trend 或 evidence 或 impact 其中之一才显示
+        if trend or evidence or impact:
+            valid_insights.append(insight)
+
+    if not valid_insights:
+        return ''
+
+    items = ''
+    for insight in valid_insights:
         confidence_class = 'high' if insight.get('confidence') == 'high' else 'medium' if insight.get('confidence') == 'medium' else 'low'
         items += f"""
         <div class="trend-item">
@@ -1103,4 +1243,16 @@ def api_get_push_logs():
 
 
 if __name__ == '__main__':
+    print('=' * 60)
+    print('📊 舆情监控系统启动')
+    print('=' * 60)
+    print(f'服务地址：http://localhost:5000')
+    print(f'数据目录：{os.path.dirname(os.path.abspath(__file__))}/data/')
+    print(f'数据库：news_monitor.db')
+    print(f'爬虫平台：{len(CRAWLER_IMPLEMENTED)} 个')
+    print(f'RSS 源：国内 {len(RSS_FEEDS_DOMESTIC)} 个，国外 {len(RSS_FEEDS_OVERSEAS)} 个')
+    print('=' * 60)
+    print('提示：爬虫数据会通过定时任务每 10 分钟自动更新')
+    print('      可通过 POST /api/refresh 手动刷新数据')
+    print('=' * 60)
     app.run(host='0.0.0.0', port=5000, debug=True)

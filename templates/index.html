@@ -758,6 +758,28 @@
             50% { opacity: 0.4; }
         }
 
+        @keyframes slideDown {
+            from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+            to {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+        }
+
         .last-update {
             font-size: 12px;
             color: #6e7781;
@@ -914,7 +936,7 @@
             border-top: 1px solid #e1e4e8;
         }
 
-        .trend-item {
+        .social-trend-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -922,11 +944,11 @@
             border-bottom: 1px dashed #d0d7de;
         }
 
-        .trend-item:last-child {
+        .social-trend-item:last-child {
             border-bottom: none;
         }
 
-        .trend-name {
+        .social-trend-name {
             color: #6e7781;
             font-size: 13px;
             font-weight: 500;
@@ -1025,8 +1047,6 @@
             font-size: 12px;
             color: #6e7781;
             margin-top: 4px;
-        }
-            margin-top: 4px;
             font-family: 'Quicksand', sans-serif;
         }
 
@@ -1052,6 +1072,103 @@
             .analysis-card {
                 grid-column: span 1 !important;
             }
+        }
+
+        /* 兴趣管理面板 */
+        .interest-manager {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e1e4e8;
+        }
+
+        .interest-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .category-chip {
+            padding: 8px 12px;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .category-chip:hover {
+            background: #e1e4e8;
+            border-color: #0969da;
+            color: #0969da;
+        }
+
+        .category-chip.selected {
+            background: #0969da;
+            border-color: #0969da;
+            color: #fff;
+        }
+
+        .my-interests {
+            margin-top: 10px;
+        }
+
+        .my-interests-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 8px;
+        }
+
+        .interest-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: #ddf4ff;
+            border: 1px solid #54aeff;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #0969da;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        .interest-tag .remove-btn {
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .interest-tag .remove-btn:hover {
+            opacity: 1;
+            color: #cf222e;
+        }
+
+        .interest-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .interest-actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-outline {
+            background: #fff;
+            border: 1px solid #d0d7de;
+            color: #475569;
+        }
+
+        .btn-outline:hover {
+            background: #f6f8fa;
+            border-color: #cf222e;
+            color: #cf222e;
         }
     </style>
 </head>
@@ -1092,6 +1209,22 @@
                 <div class="analysis-card-content" id="interest-content">
                     <div style="text-align: center; color: #64748b; padding: 20px;">
                         加载中...
+                    </div>
+                </div>
+                <!-- 兴趣管理面板 -->
+                <div class="interest-manager" id="interest-manager" style="display: none;">
+                    <p style="color: #64748b; font-size: 13px; margin-bottom: 12px;">选择您关注的行业领域，系统将为您筛选相关新闻：</p>
+                    <div class="interest-categories" id="interest-categories">
+                        <!-- 预设分类将通过 JS 动态加载 -->
+                    </div>
+                    <div class="my-interests">
+                        <div class="my-interests-title">已选领域</div>
+                        <div id="my-interests-list">
+                            <!-- 用户兴趣标签 -->
+                        </div>
+                    </div>
+                    <div class="interest-actions">
+                        <button class="btn-outline" onclick="toggleInterestManager()">收起</button>
                     </div>
                 </div>
             </div>
@@ -1141,7 +1274,21 @@
         let showTranslation = true;
         let userKeywords = []; // 用户兴趣关键词
         let userHistory = []; // 用户历史访问记录
-        const USER_ID = 'default'; // 用户 ID，可以改为从 cookie 或 localStorage 获取
+        const USER_ID = 'default'; // 用户 ID
+        let presetCategories = {}; // 预设兴趣分类
+        let selectedCategory = null; // 当前选中的分类
+
+        // 兴趣管理器显示控制
+        function toggleInterestManager() {
+            const manager = document.getElementById('interest-manager');
+            const isExpanding = manager.style.display !== 'block';
+            manager.style.display = isExpanding ? 'block' : 'none';
+
+            // 收起面板时，立即刷新兴趣卡片显示最新状态
+            if (!isExpanding) {
+                refreshInterestAnalysisCard();
+            }
+        }
 
         // 页面加载时获取用户兴趣
         async function loadUserInterests() {
@@ -1151,28 +1298,328 @@
                     const result = await response.json();
                     userKeywords = result.interests.map(i => i.keyword) || [];
                     console.log('用户兴趣：', userKeywords);
+
+                    // 如果没有兴趣数据，提示用户选择领域
+                    if (userKeywords.length === 0) {
+                        console.log('暂无关注领域，等待用户选择');
+                    }
                 }
             } catch (error) {
                 console.error('加载用户兴趣失败:', error);
             }
         }
 
+        // 加载预设兴趣分类
+        async function loadPresetCategories() {
+            try {
+                const response = await fetch('/api/user/interests/categories');
+                if (response.ok) {
+                    const result = await response.json();
+                    presetCategories = result.categories || {};
+                    renderPresetCategories();
+                }
+            } catch (error) {
+                console.error('加载预设分类失败:', error);
+            }
+        }
+
+        // 渲染预设分类
+        function renderPresetCategories() {
+            const container = document.getElementById('interest-categories');
+            if (!container) return;
+
+            let html = '';
+            for (const [category, keywords] of Object.entries(presetCategories)) {
+                const isSelected = selectedCategory === category ? 'selected' : '';
+                html += `<span class="category-chip ${isSelected}" onclick="selectCategory('${category}')">${category}</span>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // 选中分类 - 直接将该分类作为兴趣领域
+        async function selectCategory(categoryName) {
+            if (selectedCategory === categoryName) {
+                // 如果已选中，取消关注该分类
+                await unfollowCategory(categoryName);
+                selectedCategory = null;
+            } else {
+                // 关注新分类
+                if (selectedCategory) {
+                    // 先取消之前的分类
+                    await unfollowCategory(selectedCategory);
+                }
+                selectedCategory = categoryName;
+                await followCategory(categoryName);
+            }
+            renderPresetCategories();
+            await refreshUserKeywords();
+        }
+
+        // 关注分类（添加该分类下所有关键词）
+        async function followCategory(categoryName) {
+            try {
+                const response = await fetch('/api/user/interests/follow_category', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        category: categoryName
+                    })
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    showToast(`已关注"${categoryName}"领域（${result.keywords_count}个关键词）`, 'success');
+                }
+            } catch (error) {
+                console.error('关注分类失败:', error);
+            }
+        }
+
+        // 取消关注分类（移除该分类下所有关键词）
+        async function unfollowCategory(categoryName) {
+            try {
+                const response = await fetch('/api/user/interests/unfollow_category', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        category: categoryName
+                    })
+                });
+                if (response.ok) {
+                    showToast(`已取消关注"${categoryName}"`, 'success');
+                }
+            } catch (error) {
+                console.error('取消关注失败:', error);
+            }
+        }
+
+        // 添加兴趣
+        async function addInterest(keyword) {
+            try {
+                await fetch('/api/user/interests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        keyword: keyword,
+                        weight: 2.0
+                    })
+                });
+            } catch (error) {
+                console.error('添加兴趣失败:', error);
+            }
+        }
+
+        // 删除兴趣
+        async function deleteInterest(keyword) {
+            try {
+                await fetch('/api/user/interests/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        keyword: keyword
+                    })
+                });
+            } catch (error) {
+                console.error('删除兴趣失败:', error);
+            }
+        }
+
+        // 清空所有兴趣
+        async function clearAllInterests() {
+            if (!confirm('确定要清空所有兴趣标签吗？')) return;
+
+            try {
+                await fetch('/api/user/interests/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: USER_ID })
+                });
+                userKeywords = [];
+                renderMyInterests();
+                refreshInterestAnalysisCard();
+                clearCategorySelection();
+                showToast('已清空所有兴趣标签', 'success');
+            } catch (error) {
+                console.error('清空兴趣失败:', error);
+            }
+        }
+
+        // 渲染我的兴趣
+        function renderMyInterests() {
+            const container = document.getElementById('my-interests-list');
+            if (!container) return;
+
+            // 用户没有兴趣时，提示选择领域
+            if (userKeywords.length === 0) {
+                container.innerHTML = `
+                    <p style="color: #6e7781; font-size: 12px; margin-bottom: 8px;">暂无关注领域</p>
+                    <p style="color: #0969da; font-size: 11px;">💡 点击上方分类卡片开始关注</p>
+                `;
+                return;
+            }
+
+            // 显示已选的分类名称（从关键词反推分类）
+            let selectedCats = new Set();
+            for (const kw of userKeywords) {
+                for (const [cat, keywords] of Object.entries(presetCategories)) {
+                    if (keywords.includes(kw)) {
+                        selectedCats.add(cat);
+                        break;
+                    }
+                }
+            }
+
+            let html = '<p style="color: #0969da; font-size: 11px; margin-bottom: 8px;">✅ 已关注领域</p>';
+            for (const cat of selectedCats) {
+                html += `<span class="interest-tag">${cat} <span class="remove-btn" onclick="unselectCategory('${cat}')">×</span></span>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // 取消选中分类
+        async function unselectCategory(categoryName) {
+            const keywords = presetCategories[categoryName] || [];
+            for (const kw of keywords) {
+                if (userKeywords.includes(kw)) {
+                    await deleteInterest(kw);
+                    userKeywords = userKeywords.filter(k => k !== kw);
+                }
+            }
+            if (selectedCategory === categoryName) {
+                selectedCategory = null;
+            }
+            renderMyInterests();
+            renderPresetCategories();
+            refreshInterestAnalysisCard();
+            showToast(`已取消关注"${categoryName}"`, 'success');
+        }
+
+        // 从后端获取最新的用户兴趣标签
+        async function refreshUserKeywords() {
+            try {
+                const response = await fetch(`/api/user/interests?user_id=${USER_ID}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    userKeywords = (data.interests || []).map(i => i.keyword);
+                    console.log(`[兴趣更新] 已更新 ${userKeywords.length} 个兴趣标签:`, userKeywords);
+
+                    // 更新所有相关显示
+                    refreshInterestAnalysisCard();
+                    renderMyInterests();
+                    updateUserInterestsDisplay();
+                }
+            } catch (error) {
+                console.error('获取兴趣标签失败:', error);
+            }
+        }
+
+        // 刷新兴趣分析卡片的标签显示
+        function refreshInterestAnalysisCard() {
+            const interestContent = document.getElementById('interest-content');
+            if (!interestContent) return;
+
+            // 如果兴趣管理器面板是展开的，不更新卡片内容（避免干扰用户操作）
+            const manager = document.getElementById('interest-manager');
+            if (manager && manager.style.display === 'block') {
+                return;
+            }
+
+            if (userKeywords.length === 0) {
+                interestContent.innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <p style="color: #64748b; margin-bottom: 10px; font-weight: 500;">暂无关注领域</p>
+                        <p style="font-size: 12px; color: #475569; margin-bottom: 15px;">选择行业领域，定制您的专属舆情</p>
+                        <button onclick="toggleInterestManager()" style="padding: 8px 16px; font-size: 13px;">管理关注领域</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // 更新卡片中的兴趣标签列表
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 15px;">';
+            userKeywords.slice(0, 10).forEach(kw => {
+                html += `<span class="word-tag" style="background: #0969da; font-size: 12px;" onclick="searchByKeyword('${kw}')">⭐ ${kw}</span>`;
+            });
+            if (userKeywords.length > 10) {
+                html += `<span class="word-tag" style="background: #6e7781; font-size: 12px;">+${userKeywords.length - 10} 更多</span>`;
+            }
+            html += '</div>';
+            html += '<p style="color: #6e7781; font-size: 12px;">管理面板已收起，点击上方标签可快速搜索 | <a href="javascript:void(0)" onclick="toggleInterestManager()" style="color: #0969da;">展开管理</a></p>';
+            interestContent.innerHTML = html;
+        }
+
+        // 更新兴趣卡片显示
+        function updateUserInterestsDisplay() {
+            const interestsEl = document.getElementById('user-interests');
+            if (interestsEl && userKeywords.length > 0) {
+                interestsEl.innerHTML = userKeywords.map(kw =>
+                    `<span class="keyword matched">${kw}</span>`
+                ).join('');
+            }
+        }
+
+        // 显示提示消息
+        function showToast(message, type = 'info') {
+            // 创建 toast 元素
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${type === 'success' ? '#4caf50' : '#2196f3'};
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideDown 0.3s ease;
+            `;
+
+            document.body.appendChild(toast);
+
+            // 3 秒后移除
+            setTimeout(() => {
+                toast.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         // 记录用户点击
-        function recordClick(newsId, title, source) {
-            fetch('/api/user/click', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: USER_ID,
-                    news_id: newsId,
-                    title: title,
-                    source: source
-                })
-            }).catch(err => console.error('记录点击失败:', err));
+        async function recordClick(newsId, title, source) {
+            try {
+                const response = await fetch('/api/user/click', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        news_id: newsId,
+                        title: title,
+                        source: source
+                    })
+                });
+
+                if (response.ok) {
+                    console.log(`[点击记录] 已记录：${title}`);
+                    // 点击后自动更新兴趣标签
+                    await refreshUserKeywords();
+                    // 重新生成推荐
+                    if (typeof allNews !== 'undefined' && allNews.length > 0) {
+                        generateAIRecommendations(allNews);
+                    }
+                }
+            } catch (err) {
+                console.error('记录点击失败:', err);
+            }
         }
 
         // 自动刷新配置
-        const AUTO_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 分钟（毫秒）
+        const AUTO_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 分钟（毫秒）
         let refreshCountdown = AUTO_REFRESH_INTERVAL;
         let lastUpdateTime = null;
 
@@ -1189,6 +1636,9 @@
             refreshCountdown -= 1000;
             if (refreshCountdown < 0) {
                 refreshCountdown = AUTO_REFRESH_INTERVAL;
+                // 倒计时归零，触发自动刷新
+                console.log('[自动刷新] 倒计时归零，开始刷新新闻数据和分析模块...');
+                loadNews();
             }
         }
 
@@ -1207,8 +1657,8 @@
         // 启动倒计时定时器
         setInterval(updateCountdown, 1000);
 
-        // 页面加载时先获取用户兴趣
-        loadUserInterests().then(() => {
+        // 页面加载时先获取用户兴趣和预设分类
+        Promise.all([loadUserInterests(), loadPresetCategories()]).then(() => {
             // 然后加载新闻
             loadNews();
         });
@@ -1222,6 +1672,12 @@
                 const data = await response.json();
                 allNews = data;
                 renderNewsByChannel(data);
+
+                // 用户没有兴趣时，提示用户选择领域
+                if (userKeywords.length === 0) {
+                    console.log('[兴趣] 新用户，等待选择关注领域');
+                }
+
                 triggerAIAnalysis(data);
                 updateLastUpdateTime();
                 // 重置倒计时
@@ -1351,11 +1807,22 @@
             const userInterests = result.user_interests || [];
             const keywords = result.keywords || [];
 
+            // 显示兴趣管理入口
+            const manager = document.getElementById('interest-manager');
+            if (manager && userInterests.length > 0) {
+                manager.style.display = 'block';
+                renderMyInterests();
+            } else if (manager) {
+                manager.style.display = 'block';
+                renderMyInterests();
+            }
+
             if (userInterests.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 20px;">
-                        <p style="color: #64748b; margin-bottom: 10px;">暂无用户兴趣数据</p>
-                        <p style="font-size: 12px; color: #475569;">在设置中添加兴趣关键词以获得个性化推荐</p>
+                        <p style="color: #64748b; margin-bottom: 10px; font-weight: 500;">暂无兴趣标签</p>
+                        <p style="font-size: 12px; color: #475569; margin-bottom: 15px;">从下方选择兴趣分类或手动添加</p>
+                        <button onclick="toggleInterestManager()" style="padding: 8px 16px; font-size: 13px;">管理我的兴趣</button>
                     </div>
                 `;
                 return;
@@ -1399,6 +1866,9 @@
             html += '</div>';
 
             container.innerHTML = html;
+
+            // 同时更新兴趣分析卡片的简化视图（当管理面板收起时显示）
+            refreshInterestAnalysisCard();
         }
 
         // AI 推荐
@@ -1453,13 +1923,18 @@
 
             let html = '<div class="recommend-list">';
             recommendations.slice(0, 5).forEach((rec, index) => {
+                if (!rec) return; // 空值保护
+                const title = rec.title || '推荐内容';
+                const score = rec.score || 0.9;
+                const reason = rec.reason || '根据您的兴趣推荐';
+
                 html += `
                     <div class="recommend-item">
                         <div class="recommend-title">
-                            <span>${rec.title || '推荐内容'}</span>
-                            <span class="recommend-score">${rec.score || 0.9}</span>
+                            <span>${title}</span>
+                            <span class="recommend-score">${score}</span>
                         </div>
-                        <div class="recommend-reason">${rec.reason || '根据您的兴趣推荐'}</div>
+                        <div class="recommend-reason">${reason}</div>
                     </div>
                 `;
             });
@@ -1509,6 +1984,7 @@
         function renderSocialAnalysis(result, container) {
             const metrics = result.metrics || {};
             const trends = result.trends || [];
+            const viralTopics = result.viral_topics || [];
 
             let html = `
                 <div class="social-metrics">
@@ -1531,12 +2007,26 @@
                 </div>
             `;
 
+            // 显示病毒话题
+            if (viralTopics.length > 0) {
+                html += '<div class="social-trend"><strong style="color: #8b5cf6; font-size: 12px;">🔥 病毒话题</strong>';
+                viralTopics.forEach((topic, index) => {
+                    html += `
+                        <div class="social-trend-item" style="padding: 8px 0;">
+                            <span class="social-trend-name" style="font-size: 12px;">${index + 1}. ${topic.topic}</span>
+                            <span class="trend-engagement" style="font-size: 11px;">热度 ${topic.hot_score}</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
             if (trends.length > 0) {
-                html += '<div class="social-trend"><strong style="color: #8b5cf6; font-size: 12px;">📈 社交趋势</strong>';
+                html += '<div class="social-trend" style="margin-top: 10px;"><strong style="color: #8b5cf6; font-size: 12px;">📈 社交趋势</strong>';
                 trends.slice(0, 3).forEach(trend => {
                     html += `
-                        <div class="trend-item">
-                            <span class="trend-name">${trend.topic}</span>
+                        <div class="social-trend-item">
+                            <span class="social-trend-name">${trend.topic}</span>
                             <span class="trend-engagement">${trend.engagement} 互动</span>
                         </div>
                     `;
@@ -1747,11 +2237,8 @@
             }
         });
 
-        // 定时刷新：每 30 分钟自动刷新一次
-        setInterval(() => {
-            console.log('[自动刷新] 开始刷新新闻数据和分析模块...');
-            loadNews();
-        }, AUTO_REFRESH_INTERVAL);
+        // 定时刷新：每 10 分钟自动刷新一次（通过倒计时触发）
+        // 注：不再使用 setInterval 重复触发，而是由 updateCountdown 在倒计时归零时触发
     </script>
 </body>
 </html>

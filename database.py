@@ -127,7 +127,10 @@ def init_db():
 
 def save_news(news_list):
     """
-    批量保存新闻（自动去重）
+    批量保存新闻（严格去重）
+    去重策略：
+    1. 频道去重：source 字段自动去重（相同 source 的内容会合并）
+    2. 内容去重：link 唯一约束 + title+source 复合检查
     :param news_list: 新闻列表
     :return: 新增的新闻数量
     """
@@ -135,32 +138,80 @@ def save_news(news_list):
     cursor = conn.cursor()
 
     saved_count = 0
+    duplicate_count = 0
+
     for news in news_list:
         try:
+            # 生成唯一 news_id（如果爬虫没有提供）
+            news_id = news.get('id')
+            if not news_id:
+                # 使用 link 的哈希值作为 ID（确保唯一性）
+                import hashlib
+                link = news.get('link', '') or news.get('url', '')
+                title = news.get('title', '')
+                source = news.get('source', '')
+                # 使用 title+source+link 生成唯一 ID
+                unique_key = f"{title}:{source}:{link}"
+                news_id = int(hashlib.md5(unique_key.encode('utf-8')).hexdigest()[:12], 16)
+
+            # 获取 URL（兼容不同字段名）
+            link = news.get('link') or news.get('url', '')
+
+            # 首先检查 link 是否已存在（最快）
+            if link:
+                cursor.execute('SELECT COUNT(*) FROM news WHERE link = ?', (link,))
+                if cursor.fetchone()[0] > 0:
+                    duplicate_count += 1
+                    continue
+
+            # 如果 link 为空或不存在，检查 title+source 组合
+            title = news.get('title', '')
+            source = news.get('source', '')
+            if title and source:
+                cursor.execute(
+                    'SELECT COUNT(*) FROM news WHERE title = ? AND source = ?',
+                    (title, source)
+                )
+                if cursor.fetchone()[0] > 0:
+                    duplicate_count += 1
+                    continue
+
+            # 通过所有去重检查，插入新闻
             cursor.execute('''
                 INSERT OR IGNORE INTO news
                 (news_id, title, original_title, source, published, sentiment, hot_score, link, lang, content, priority)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                news.get('id'),
+                news_id,
                 news.get('title'),
                 news.get('original_title'),
-                news.get('source'),
+                source,
                 news.get('published'),
                 news.get('sentiment'),
                 news.get('hot_score'),
-                news.get('link'),
+                link,
                 news.get('lang'),
                 news.get('content', ''),
                 news.get('priority', 'overseas')
             ))
+
             if cursor.rowcount > 0:
                 saved_count += 1
+                print(f"  ✓ 新增新闻：{title[:30]}...")
+            else:
+                duplicate_count += 1
+
         except Exception as e:
             print(f"保存新闻失败：{e}")
 
     conn.commit()
     conn.close()
+
+    # 输出去重统计
+    total = saved_count + duplicate_count
+    if total > 0:
+        print(f"  📊 去重统计：新增 {saved_count} 条，重复 {duplicate_count} 条，共 {total} 条")
+
     return saved_count
 
 
@@ -208,11 +259,12 @@ def get_news_by_channel(channel_limit=15):
     # 定义爬虫平台列表（需要排在最前面）
     crawler_platforms = ['36 氪科技', '今日头条', '微博热搜', '百度热搜', '知乎热榜', 'B 站热搜']
 
-    # 获取所有平台列表
+    # 获取所有平台列表（只按 source 去重，避免同一来源因 priority 不同而重复）
     cursor.execute('''
-        SELECT DISTINCT source, priority
+        SELECT source, MIN(priority) as priority
         FROM news
         WHERE source != '36Kr'  -- 排除 36Kr
+        GROUP BY source
         ORDER BY source
     ''')
 
@@ -653,11 +705,12 @@ def get_personalized_news(user_id='default', channel_limit=15):
     # 定义爬虫平台列表
     crawler_platforms = ['36 氪科技', '今日头条', '微博热搜', '百度热搜', '知乎热榜', 'B 站热搜']
 
-    # 获取所有平台列表
+    # 获取所有平台列表（只按 source 去重，避免同一来源因 priority 不同而重复）
     cursor.execute('''
-        SELECT DISTINCT source, priority
+        SELECT source, MIN(priority) as priority
         FROM news
         WHERE source != '36Kr'
+        GROUP BY source
         ORDER BY source
     ''')
     all_platforms = cursor.fetchall()
@@ -729,8 +782,21 @@ def get_personalized_news(user_id='default', channel_limit=15):
 # 初始化数据库时创建用户兴趣表
 _original_init_db = init_db
 
+# 预设兴趣分类 - 面向 5000 万 -5 亿规模传统行业中小企业
+PRESET_INTEREST_CATEGORIES = {
+    "宏观政策": ["政策", "法规", "税收", "补贴", "监管", "产业支持", "专精特新", "中小企业", "营商环境", "外贸", "出口", "进口", "关税", "信贷", "融资支持"],
+    "行业趋势": ["转型", "数字化", "智能化", "升级", "创新", "技术突破", "国产替代", "供应链", "产业链", "产业集群", "行业报告", "市场分析", "竞争格局"],
+    "经营管理": ["管理", "组织", "人才", "招聘", "培训", "绩效", "激励", "股权", "薪酬", "企业文化", "团队建设", "领导力", "战略", "商业模式"],
+    "市场营销": ["营销", "品牌", "渠道", "客户", "销售", "推广", "获客", "私域", "直播", "电商", "跨境电商", "展会", "招商", "经销商", "代理商"],
+    "财税金融": ["财税", "税务", "发票", "审计", "会计", "贷款", "融资", "银行", "担保", "保险", "理财", "现金流", "成本控制", "预算", "上市", "IPO", "新三板"],
+    "法律合规": ["法律", "合规", "合同", "劳动", "知识产权", "专利", "商标", "诉讼", "仲裁", "工商", "质检", "环保", "安全生产", "数据合规"],
+    "技术升级": ["自动化", "机器人", "智能制造", "工业互联网", "物联网", "5G", "云计算", "AI 应用", "数字化转型", "MES", "ERP", "信息化", "设备升级"],
+    "供应链": ["供应链", "采购", "供应商", "物流", "仓储", "库存", "配送", "跨境电商物流", "冷链", "原材料", "价格上涨", "缺货", "产能"],
+}
+
+
 def init_db_with_user_interests():
-    """扩展初始化，添加用户兴趣表"""
+    """扩展初始化，添加用户兴趣表和预设分类"""
     _original_init_db()
 
     conn = get_db_connection()
@@ -763,6 +829,18 @@ def init_db_with_user_interests():
     # 创建索引
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_interests ON user_interests(user_id, weight DESC)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_click ON user_click_log(user_id, clicked_at DESC)')
+
+    # 初始化预设兴趣分类到数据库（如果数据库为空）
+    cursor.execute('SELECT COUNT(*) FROM user_interests WHERE user_id = ?', ('default',))
+    if cursor.fetchone()[0] == 0:
+        print("初始化预设兴趣分类到数据库...")
+        for category, keywords in PRESET_INTEREST_CATEGORIES.items():
+            for keyword in keywords:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO user_interests (user_id, keyword, weight)
+                    VALUES (?, ?, ?)
+                ''', ('preset_' + category, keyword, 1.0))
+        print(f"已加载 {len(PRESET_INTEREST_CATEGORIES)} 个预设分类，共{sum(len(kws) for kws in PRESET_INTEREST_CATEGORIES.values())}个关键词")
 
     conn.commit()
     conn.close()
