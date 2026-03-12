@@ -1,4 +1,13 @@
+// OpenClaw UI Token Setter (使用环境变量)
+// 用法：OPENCLAW_TOKEN=your_token node set-token-ui.js
 const { chromium } = require('playwright');
+
+const TOKEN = process.env.OPENCLAW_TOKEN;
+if (!TOKEN) {
+  console.error('❌ 错误：请设置环境变量 OPENCLAW_TOKEN');
+  console.error('用法：OPENCLAW_TOKEN=your_token node set-token-ui.js');
+  process.exit(1);
+}
 
 (async () => {
   console.log('启动 Chrome...');
@@ -14,42 +23,17 @@ const { chromium } = require('playwright');
   console.log('访问网关页面 http://localhost:18789 ...');
   await page.goto('http://localhost:18789', { waitUntil: 'networkidle' });
 
-  const token = '6a18e607f503da246628896da5649b06dc05446da4c88fd5';
-
-  // 尝试点击设置按钮
-  console.log('尝试打开设置面板...');
-
   // 等待页面加载
   await page.waitForTimeout(3000);
-
-  // 尝试寻找设置按钮并点击
-  try {
-    // 尝试多种可能的设置选择器
-    await page.click('button:has-text("配置")').catch(() => {});
-    await page.waitForTimeout(2000);
-
-    // 或者尝试直接点击左下角的设置图标
-    await page.click('[aria-label="settings"]').catch(() => {});
-    await page.waitForTimeout(2000);
-
-    // 或者尝试点击侧边栏的设置
-    await page.click('text=设置').catch(() => {});
-    await page.waitForTimeout(2000);
-
-    console.log('已尝试打开设置面板');
-  } catch (e) {
-    console.log('无法自动打开设置面板:', e.message);
-  }
 
   // 设置 localStorage
   console.log('设置 localStorage token...');
   await page.evaluate((token) => {
     localStorage.setItem('gateway-token', token);
     localStorage.setItem('openclaw-gateway-token', token);
-    // 也尝试设置 sessionStorage
     sessionStorage.setItem('gateway-token', token);
     sessionStorage.setItem('openclaw-gateway-token', token);
-  }, token);
+  }, TOKEN);
 
   // 验证
   const storedToken = await page.evaluate(() => localStorage.getItem('gateway-token'));

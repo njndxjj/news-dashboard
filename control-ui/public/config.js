@@ -1,5 +1,7 @@
 // OpenClaw Gateway Token Configuration
-window.OPENCLAW_GATEWAY_TOKEN = '6a18e607f503da246628896da5649b06dc05446da4c88fd5';
+// ⚠️ SECURITY: Token should be set via environment variable, not hardcoded
+// Use: window.OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN;
+window.OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 
 // Auto-configure on load
 (function() {
