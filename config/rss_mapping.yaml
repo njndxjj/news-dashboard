@@ -1,0 +1,128 @@
+# RSS 源映射配置
+# 为 config.yaml 中的平台 ID 提供对应的 RSS 地址
+# 没有配置 RSS 的平台将通过爬虫方式获取（待实现）
+# 标记：domestic=国内，overseas=国外
+
+rss_mapping:
+  # === 科技类平台（国内）===
+  ithome:
+    url: "https://www.ithome.com/rss/"
+    region: domestic
+  juejin:
+    url: "https://juejin.im/feed"
+    region: domestic
+  solidot:
+    url: "https://www.solidot.org/index.rss"
+    region: domestic
+  v2ex:
+    url: "https://www.v2ex.com/feed.xml"
+    region: domestic
+
+  # === 科技类平台（国外）===
+  hackernews:
+    url: "https://news.ycombinator.com/rss"
+    region: overseas
+  producthunt:
+    url: "https://www.producthunt.com/feed"
+    region: overseas
+  github:
+    url: "https://github.blog/feed/"
+    region: overseas
+
+  # === 财经投资类（国内）===
+  wallstreetcn-hot:
+    url: "https://www.wallstreetcn.com/rss/articles"
+    region: domestic
+  wallstreetcn-quick:
+    url: "https://www.wallstreetcn.com/rss/live"
+    region: domestic
+  cls-hot:
+    url: "https://www.cls.cn/api/web/roll/getRollList"
+    region: domestic
+    requires_crawler: true
+  gelonghui:
+    url: "https://www.gelonghui.com/rss"
+    region: domestic
+  xueqiu:
+    url: "https://xueqiu.com/hotsymbol/rss"
+    region: domestic
+
+  # === 财经投资类（国外）===
+  forbes:
+    url: "https://www.forbes.com/business/feed/"
+    region: overseas
+  cnbc:
+    url: "https://www.cnbc.com/id/10001135/device/rss/rss.html"
+    region: overseas
+
+  # === 综合新闻媒体类（国内）===
+  thepaper:
+    url: "https://cache.thepaper.cn/contentapi/wwwIndexRight"
+    region: domestic
+  zaobao:
+    url: "https://www.zaobao.com.sg/rss/realtime/china.xml"
+    region: domestic
+  ifeng:
+    url: "https://i.ifeng.com/c/feed/7z326F3zPvI"
+    region: domestic
+
+  # === 综合新闻媒体类（国外）===
+  techcrunch:
+    url: "https://techcrunch.com/feed/"
+    region: overseas
+  theverge:
+    url: "http://www.theverge.com/rss/full.xml"
+    region: overseas
+  fastcompany:
+    url: "https://www.fastcompany.com/rss"
+    region: overseas
+  inc:
+    url: "https://www.inc.com/rss"
+    region: overseas
+  entrepreneur:
+    url: "https://www.entrepreneur.com/latest.rss"
+    region: overseas
+
+  # === 学习成长/管理（国外）===
+  fs-blog:
+    url: "https://fs.blog/feed/"
+    region: overseas
+  scotthyoung:
+    url: "https://www.scotthyoung.com/blog/feed/"
+    region: overseas
+  mit-sloan:
+    url: "https://sloanreview.mit.edu/feed/"
+    region: overseas
+  wharton:
+    url: "https://knowledge.wharton.upenn.edu/feed/"
+    region: overseas
+  steveblank:
+    url: "http://steveblank.com/feed/"
+    region: overseas
+  pragmatic-engineer:
+    url: "https://blog.pragmaticengineer.com/rss/"
+    region: overseas
+
+# 需要爬虫实现的平台（无 RSS 源）
+# - toutiao (今日头条)
+# - baidu (百度热搜)
+# - weibo (微博)
+# - douyin (抖音)
+# - bilibili-hot-search (B 站热搜)
+# - zhihu (知乎)
+# - tieba (贴吧)
+# - hupu (虎扑)
+# - nowcoder (牛客网)
+# - pcbeta (远景论坛)
+# - sspai (少数派)
+# - chongbuluo (虫部落)
+# - jin10 (金十数据)
+# - fastbull (快讯通/法布财经)
+# - tencent-hot (腾讯新闻)
+# - cls-telegraph (财联社电报)
+# - cls-depth (财联社深度)
+# - ifeng (凤凰网)
+# - cankaoxiaoxi (参考消息)
+# - sputniknewscn (卫星通讯社)
+# - mktnews (MKT 新闻)
+# - kaopu (靠谱新闻)

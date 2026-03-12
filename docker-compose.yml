@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  news-monitor:
+    build: .
+    container_name: news-monitor-app
+    ports:
+      - "5000:5000"
+    volumes:
+      # 数据持久化（重要：保存数据库和缓存）
+      - ./data:/app/data
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - FEISHU_WEBHOOK=${FEISHU_WEBHOOK:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/news"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 资源限制（可选，防止内存占用过高）
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
