@@ -1,0 +1,2587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资讯监控平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 陶土风配色方案 */
+            --bg-primary: #FDFBF7;             /* 奶油色背景 */
+            --bg-secondary: #F8F5F0;           /* 米白色背景 */
+            --accent-primary: #E07A5F;         /* 陶土橙主色 */
+            --accent-secondary: #C96B52;       /* 深陶土色 */
+            --accent-gold: #F4D38C;            /* 辅助黄 */
+            --accent-green: #6B9080;           /* 辅助绿 */
+            --accent-pink: #E8C5C5;            /* 柔粉点缀 */
+            --accent-blue: #B8C5D6;            /* 浅蓝点缀（改用柔和色调） */
+            --text-primary: #2D2D2D;           /* 炭黑色文字 */
+            --text-secondary: #555555;         /* 灰色文字 */
+            --border-subtle: rgba(45, 45, 45, 0.12);
+            --shadow-sm: 0 1px 2px rgba(45, 45, 45, 0.08);
+            --shadow-md: 0 4px 12px rgba(45, 45, 45, 0.1);
+            --shadow-lg: 0 8px 24px rgba(45, 45, 45, 0.12);
+            --shadow-xl: 0 12px 40px rgba(45, 45, 45, 0.15);
+            --border-thick: 2.5px solid var(--text-primary);
+            --border-rounded: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background:
+                radial-gradient(circle at 20% 30%, var(--accent-blue) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, var(--accent-pink) 0%, transparent 50%),
+                linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            min-height: 100vh;
+            padding: 24px;
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 手绘风格装饰点阵背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(var(--text-primary) 1px, transparent 1px),
+                radial-gradient(var(--text-primary) 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 16px;
+            padding: 16px 20px;
+            box-shadow: none;
+            z-index: 1000;
+            min-width: 240px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .status-item:last-child { margin-bottom: 0; }
+
+        .status-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .refresh-countdown {
+            color: var(--accent-primary);
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10B981;
+            display: inline-block;
+            margin-right: 6px;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* AI 智能分析 - 总裁简报格式 */
+        .ai-analysis {
+            background: #fff;
+            border: var(--border-thick);
+            padding: 0;
+            margin-bottom: 28px;
+            border-radius: var(--border-rounded);
+            box-shadow: none;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .ai-analysis:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: none;
+        }
+
+        .ai-analysis::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-gold) 50%, var(--accent-primary) 100%);
+        }
+
+        /* 简报头部 */
+        .brief-header {
+            padding: 24px 32px 20px 32px;
+            border-bottom: 1px solid rgba(217, 119, 6, 0.08);
+            background: linear-gradient(180deg, rgba(245, 158, 11, 0.03) 0%, transparent 100%);
+        }
+
+        .brief-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .brief-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brief-title h3 {
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Noto Serif SC', serif;
+            letter-spacing: 0.5px;
+        }
+
+        .brief-badge {
+            background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .brief-time {
+            color: var(--text-secondary);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .brief-time::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #10B981;
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        /* 关键指标行 */
+        .brief-metrics {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .metric-badge {
+            background: white;
+            border: 1px solid rgba(217, 119, 6, 0.15);
+            padding: 10px 16px;
+            border-radius: 10px;
+            min-width: 120px;
+        }
+
+        .metric-badge-label {
+            color: var(--text-secondary);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .metric-badge-value {
+            color: var(--text-primary);
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .metric-badge-trend {
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        .trend-up { color: #10B981; }
+        .trend-down { color: #EF4444; }
+        .trend-neutral { color: var(--text-secondary); }
+
+        /* 简报内容区 */
+        .brief-content {
+            padding: 24px 32px;
+        }
+
+        .brief-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        /* 核心洞察 */
+        .insights-section {
+            border-right: 1px dashed rgba(217, 119, 6, 0.12);
+            padding-right: 24px;
+        }
+
+        .section-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid rgba(217, 119, 6, 0.15);
+        }
+
+        .section-label-icon {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+        }
+
+        .insight-item {
+            background: white;
+            border: 1px solid rgba(217, 119, 6, 0.08);
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .insight-item:hover {
+            border-color: rgba(217, 119, 6, 0.2);
+            box-shadow: 0 2px 8px rgba(217, 119, 6, 0.06);
+            transform: translateX(2px);
+        }
+
+        .insight-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .insight-priority {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 8px;
+        }
+
+        .priority-high {
+            background: rgba(239, 68, 68, 0.1);
+            color: #DC2626;
+        }
+
+        .priority-medium {
+            background: rgba(245, 158, 11, 0.1);
+            color: #D97706;
+        }
+
+        .priority-low {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+        }
+
+        .insight-title {
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .insight-desc {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        /* 侧边栏 */
+        .sidebar-section {
+            padding-left: 8px;
+        }
+
+        .quick-stats {
+            background: white;
+            border: 1px solid rgba(217, 119, 6, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .quick-stats-title {
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(217, 119, 6, 0.08);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .action-items {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(255, 255, 255, 0.5) 100%);
+            border: 1px solid rgba(217, 119, 6, 0.12);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .action-title {
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-list {
+            list-style: none;
+        }
+
+        .action-list li {
+            color: var(--text-secondary);
+            font-size: 12px;
+            padding: 6px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .action-list li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: var(--accent-gold);
+            font-size: 10px;
+        }
+
+        .ai-analysis-content {
+            color: var(--text-secondary);
+            line-height: 1.9;
+            font-size: 14px;
+        }
+
+        /* 分析卡片通用样式 */
+        .analysis-card {
+            background: linear-gradient(135deg, #FFFEF9 0%, #FFFEFB 100%);
+            border: 1px solid rgba(217, 119, 6, 0.08);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .analysis-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent 0%, var(--accent-blue) 50%, transparent 100%);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .analysis-card:hover {
+            box-shadow: none;
+            transform: translateY(-2px);
+        }
+
+        .analysis-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .analysis-card h3 {
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .analysis-card-content {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* 关键词词云 */
+        .word-cloud-container {
+            width: 100%;
+            min-height: 160px;
+            background: linear-gradient(135deg, #FFFDF8 0%, #FFFEF6 100%);
+            border: 1px solid rgba(217, 119, 6, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .word-tag {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            color: #fff;
+            border: 2px solid var(--text-primary);
+            box-shadow: none;
+        }
+
+        .word-tag:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: none;
+        }
+
+        .word-tag.hot {
+            background: linear-gradient(135deg, #EF4444 0%, #F97316 100%);
+        }
+
+        /* 兴趣匹配进度条 */
+        .interest-bar {
+            height: 20px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid var(--text-primary);
+        }
+
+        .interest-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .interest-bar-fill.high {
+            background: var(--accent-green);
+        }
+        .interest-bar-fill.medium {
+            background: var(--accent-gold);
+        }
+        .interest-bar-fill.low {
+            background: var(--accent-primary);
+        }
+
+        .interest-bar-text {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        /* 控制栏 */
+        .controls {
+            background: #fff;
+            border: var(--border-thick);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: none;
+            border-radius: var(--border-rounded);
+            transition: all 0.2s ease;
+        }
+
+        .controls:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: none;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--text-primary);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: #fff;
+            box-shadow: none;
+        }
+
+        input[type="text"]::placeholder {
+            color: #888;
+        }
+
+        /* 手绘风格按钮 */
+        button {
+            padding: 12px 24px;
+            background: var(--accent-primary);
+            color: #fff;
+            border: 2px solid var(--text-primary);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: none;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+        }
+
+        button:hover {
+            background: var(--accent-secondary);
+            transform: translate(-1px, -1px);
+            box-shadow: none;
+        }
+
+        button:active {
+            transform: translate(1px, 1px);
+            box-shadow: none;
+        }
+
+        .refresh-btn {
+            background: var(--accent-green);
+        }
+
+        .refresh-btn:hover {
+            background: #5A7D6E;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            border: 2px solid var(--text-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--text-primary);
+        }
+
+        .filter-btn:hover:not(.active) {
+            background: var(--accent-pink);
+            transform: translate(-1px, -1px);
+            box-shadow: none;
+        }
+
+        .translate-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            background: var(--bg-secondary);
+            padding: 8px 12px;
+            border: 2px solid var(--text-primary);
+            border-radius: 8px;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .translate-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent-blue);
+        }
+
+        .translate-toggle label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* 新闻卡片 */
+        .channel-card {
+            background: #fff;
+            border: var(--border-thick);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            max-height: 70vh;
+            overflow: hidden;
+            border-radius: var(--border-rounded);
+            box-shadow: none;
+            transition: all 0.2s ease;
+        }
+
+        .channel-card:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: none;
+        }
+
+        .channel-header {
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            color: #fff;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--text-primary);
+            flex-shrink: 0;
+        }
+
+        .channel-name {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+        }
+
+        .channel-count {
+            background: #fff;
+            color: var(--accent-primary);
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 2px solid var(--text-primary);
+            border-radius: 12px;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .channel-news-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            overflow-y: auto;
+            flex: 1;
+            padding: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 39px,
+                rgba(0,0,0,0.02) 40px
+            );
+        }
+
+        .channel-news-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .channel-news-list::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border: 2px solid var(--text-primary);
+        }
+
+        .channel-news-list::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border: 2px solid var(--text-primary);
+            border-radius: 4px;
+        }
+
+        .news-item {
+            background: #fff;
+            border: 2px solid var(--text-primary);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 8px;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .news-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: none;
+            transform: translate(-1px, -1px);
+        }
+
+        .news-item-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .news-item-title {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .news-item-title:hover {
+            color: var(--accent-primary);
+        }
+
+        .sentiment-badge {
+            padding: 5px 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-radius: 8px;
+            letter-spacing: 0.5px;
+            border: 2px solid var(--text-primary);
+        }
+
+        .sentiment-positive {
+            background: var(--accent-green);
+            color: #fff;
+        }
+
+        .sentiment-negative {
+            background: #E88D8D;
+            color: #fff;
+        }
+
+        .sentiment-neutral {
+            background: var(--accent-gold);
+            color: #5c4a2a;
+            border: 2px solid var(--text-primary);
+        }
+
+        .trans-badge {
+            background: var(--accent-gold);
+            color: #5c4a2a;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 8px;
+            border: 2px solid var(--text-primary);
+        }
+
+        .news-item-meta {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .news-item-date {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* 加载状态 */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .loading::before {
+            content: '';
+            display: block;
+            width: 36px;
+            height: 36px;
+            border: 3px solid #E5E7EB;
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #FFFDF8 0%, #FFFEF6 100%);
+            border: 2px dashed rgba(217, 119, 6, 0.2);
+            color: var(--text-secondary);
+            border-radius: 16px;
+        }
+
+        .no-data h3 {
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* 新闻网格布局 */
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        /* 新版三列布局 */
+        .analysis-modules-new {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 28px;
+        }
+
+        .analysis-modules-new > .full-width {
+            grid-column: span 3;
+        }
+
+        @media (max-width: 1200px) {
+            .analysis-modules-new {
+                grid-template-columns: 1fr;
+            }
+            .analysis-modules-new > .full-width {
+                grid-column: span 1;
+            }
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            .search-box {
+                flex-direction: column;
+            }
+
+            .news-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-buttons {
+                justify-content: center;
+            }
+
+            .translate-toggle {
+                margin-left: 0;
+                justify-content: center;
+                width: 100%;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1200px) {
+            .news-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* 兴趣管理器 */
+        .interest-manager {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .interest-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .category-chip {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #FFFEF9 0%, #FFFEFB 100%);
+            border: 1.5px solid rgba(217, 119, 6, 0.15);
+            border-radius: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .category-chip:hover {
+            background: var(--accent-pink);
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+            transform: translate(-1px, -1px);
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .category-chip.selected {
+            background: var(--accent-primary);
+            border-color: var(--text-primary);
+            color: #fff;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .my-interests {
+            margin-top: 12px;
+        }
+
+        .my-interests-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .interest-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--accent-gold);
+            border: 2px solid var(--text-primary);
+            border-radius: 12px;
+            font-size: 12px;
+            color: var(--text-primary);
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .interest-tag .remove-btn {
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.7;
+            font-size: 16px;
+        }
+
+        .interest-tag .remove-btn:hover {
+            opacity: 1;
+            color: #EF4444;
+        }
+
+        .interest-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn-outline {
+            background: linear-gradient(135deg, #FFFEF9 0%, #FFFEFB 100%);
+            border: 1.5px solid rgba(217, 119, 6, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .btn-outline:hover {
+            background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+            border-color: #EF4444;
+            color: #EF4444;
+        }
+
+        /* Toast 提示 */
+        .toast {
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+            to {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+            }
+        }
+
+        /* 社交分析指标 */
+        .social-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .social-metric {
+            background: var(--bg-secondary);
+            border: 2px solid var(--text-primary);
+            padding: 16px;
+            text-align: center;
+            border-radius: 8px;
+            transition: all 0.2s;
+            box-shadow: 2px 2px 0 var(--text-primary);
+        }
+
+        .social-metric:hover {
+            border-color: var(--accent-primary);
+            background: #fff;
+            transform: translate(-1px, -1px);
+            box-shadow: none;
+        }
+
+        .metric-value {
+            color: var(--text-primary);
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-top: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .social-trend {
+            margin-top: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #FFFEF9 0%, #FFFEFB 100%);
+            border-top: 1px solid rgba(217, 119, 6, 0.1);
+            border-radius: 10px;
+        }
+
+        .social-trend-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border-subtle);
+        }
+
+        .social-trend-item:last-child {
+            border-bottom: none;
+        }
+
+        .social-trend-name {
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .trend-engagement {
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* 推荐列表 */
+        .recommend-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .recommend-item {
+            background: linear-gradient(135deg, #FFFEF9 0%, #FFFEFB 100%);
+            border: 1px solid rgba(217, 119, 6, 0.08);
+            padding: 14px;
+            transition: all 0.2s ease;
+            border-radius: 10px;
+        }
+
+        .recommend-item:hover {
+            border-color: var(--accent-primary);
+            background: #fff;
+            transform: translate(-1px, -1px);
+            box-shadow: none;
+        }
+
+        .recommend-title-link {
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .recommend-title-link:hover {
+            color: var(--accent-blue);
+        }
+
+        .recommend-score {
+            background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 6px;
+            display: inline-block;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .recommend-reason {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .last-update {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <!-- 装饰性背景光晕 -->
+    <div class="bg-glow">
+        <div class="bg-glow-1"></div>
+        <div class="bg-glow-2"></div>
+    </div>
+
+    <!-- 状态显示栏 -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-label"><span class="status-dot"></span>自动刷新</span>
+            <span class="refresh-countdown" id="countdown">30:00</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">最后更新</span>
+            <span class="last-update" id="last-update">--:--:--</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 1. 顶部：AI 智能分析（总裁简报格式） -->
+        <div id="ai-analysis" class="ai-analysis" style="display: none; margin-bottom: 25px;">
+            <!-- 简报头部 -->
+            <div class="brief-header">
+                <div class="brief-title-row">
+                    <div class="brief-title">
+                        <h3>🤖 AI 智能分析</h3>
+                        <span class="brief-badge" id="analysis-badge">深度分析</span>
+                    </div>
+                    <div class="brief-time">实时分析</div>
+                </div>
+                <!-- 关键指标 -->
+                <div class="brief-metrics">
+                    <div class="metric-badge">
+                        <div class="metric-badge-label">情感倾向</div>
+                        <div class="metric-badge-value" id="metric-sentiment">--</div>
+                        <div class="metric-badge-trend trend-neutral" id="sentiment-trend">待分析</div>
+                    </div>
+                    <div class="metric-badge">
+                        <div class="metric-badge-label">关键主题</div>
+                        <div class="metric-badge-value" id="metric-topics">--</div>
+                        <div class="metric-badge-trend trend-neutral">个热点</div>
+                    </div>
+                    <div class="metric-badge">
+                        <div class="metric-badge-label">信息密度</div>
+                        <div class="metric-badge-value" id="metric-density">--</div>
+                        <div class="metric-badge-trend trend-neutral">待计算</div>
+                    </div>
+                    <div class="metric-badge">
+                        <div class="metric-badge-label">风险等级</div>
+                        <div class="metric-badge-value" id="metric-risk">--</div>
+                        <div class="metric-badge-trend trend-neutral">待评估</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 简报内容区 -->
+            <div class="brief-content">
+                <div class="brief-grid">
+                    <!-- 左侧：核心洞察 -->
+                    <div class="insights-section">
+                        <div class="section-label">
+                            <div class="section-label-icon">💡</div>
+                            核心洞察
+                        </div>
+                        <div id="insights-container">
+                            <div class="insight-item">
+                                <span class="insight-priority priority-high">高优先级</span>
+                                <div class="insight-title">正在分析资讯内容...</div>
+                                <div class="insight-desc">AI 正在深度解析文本，提取关键信息和洞察，请稍候。</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：快速统计和行动项 -->
+                    <div class="sidebar-section">
+                        <div class="quick-stats">
+                            <div class="quick-stats-title">📊 快速统计</div>
+                            <div class="stat-row">
+                                <span class="stat-label">分析字数</span>
+                                <span class="stat-value" id="stat-words">--</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">实体识别</span>
+                                <span class="stat-value" id="stat-entities">--</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">关键词</span>
+                                <span class="stat-value" id="stat-keywords">--</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">情感得分</span>
+                                <span class="stat-value" id="stat-score">--</span>
+                            </div>
+                        </div>
+
+                        <div class="action-items">
+                            <div class="action-title">🎯 建议行动</div>
+                            <ul class="action-list" id="action-list">
+                                <li>等待分析完成</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 新增：三大分析模块（新布局） -->
+        <!-- 第一行：关键词云图（全宽） -->
+        <div class="analysis-card keyword-analysis full-width" id="keyword-analysis" style="display: none;">
+            <h3>🔑 关键词云图</h3>
+            <div class="word-cloud-container">
+                <div class="word-cloud" id="word-cloud-content"></div>
+            </div>
+        </div>
+
+        <!-- 第二行：三列等宽布局 -->
+        <div class="analysis-modules-new">
+            <!-- 左：用户兴趣与匹配分析 -->
+            <div class="analysis-card interest-analysis" id="interest-analysis" style="display: none;">
+                <h3>🎯 兴趣匹配分析</h3>
+                <div class="analysis-card-content" id="interest-content">
+                    <div style="text-align: center; color: #64748b; padding: 20px;">
+                        加载中...
+                    </div>
+                </div>
+                <!-- 兴趣管理面板 -->
+                <div class="interest-manager" id="interest-manager" style="display: none;">
+                    <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">选择您关注的行业领域，系统将为您筛选相关新闻：</p>
+                    <div class="interest-categories" id="interest-categories">
+                        <!-- 预设分类将通过 JS 动态加载 -->
+                    </div>
+                    <div class="my-interests">
+                        <div class="my-interests-title">已选领域</div>
+                        <div id="my-interests-list">
+                            <!-- 用户兴趣标签 -->
+                        </div>
+                    </div>
+                    <div class="interest-actions">
+                        <button class="btn-outline" onclick="toggleInterestManager()">收起</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中：AI 推荐 -->
+            <div class="analysis-card ai-recommend" id="ai-recommend" style="display: none;">
+                <h3>✨ AI 推荐</h3>
+                <div class="analysis-card-content" id="recommend-content"></div>
+            </div>
+
+            <!-- 右：社交分析 -->
+            <div class="analysis-card social-analysis" id="social-analysis" style="display: none;">
+                <h3>📱 社交分析</h3>
+                <div class="analysis-card-content" id="social-content"></div>
+            </div>
+        </div>
+
+        <!-- 3. 中间：搜索和控制栏 -->
+        <div class="controls" style="margin-bottom: 25px;">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="搜索关键词，例如：AI、智能手机、新能源汽车..." style="flex: 1;">
+                <button onclick="searchNews()">🔍 搜索</button>
+                <button class="refresh-btn" onclick="loadNews()">🔄 刷新</button>
+            </div>
+
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterSentiment('all', this)">全部</button>
+                <button class="filter-btn" onclick="filterSentiment('positive', this)">正面</button>
+                <button class="filter-btn" onclick="filterSentiment('neutral', this)">中性</button>
+                <button class="filter-btn" onclick="filterSentiment('negative', this)">负面</button>
+                <div class="translate-toggle">
+                    <input type="checkbox" id="translate-toggle" checked onchange="toggleTranslation()">
+                    <label for="translate-toggle">🌐 自动翻译英文</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 底部：聚合资讯 -->
+        <div id="news-container" class="news-grid">
+            <div class="loading">正在加载新闻数据...</div>
+        </div>
+    </div>
+
+    <script>
+        let allNews = [];
+        let currentFilter = 'all';
+        let showTranslation = true;
+        let userKeywords = []; // 用户兴趣关键词
+        let userHistory = []; // 用户历史访问记录
+        const USER_ID = 'default'; // 用户 ID
+        let presetCategories = {}; // 预设兴趣分类
+        let selectedCategory = null; // 当前选中的分类
+
+        // 兴趣管理器显示控制
+        function toggleInterestManager() {
+            const manager = document.getElementById('interest-manager');
+            const isExpanding = manager.style.display !== 'block';
+            manager.style.display = isExpanding ? 'block' : 'none';
+
+            // 收起面板时，立即刷新兴趣卡片显示最新状态
+            if (!isExpanding) {
+                refreshInterestAnalysisCard();
+            }
+        }
+
+        // 页面加载时获取用户兴趣
+        async function loadUserInterests() {
+            try {
+                const response = await fetch(`/api/user/interests?user_id=${USER_ID}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    userKeywords = result.interests.map(i => i.keyword) || [];
+                    console.log('用户兴趣：', userKeywords);
+
+                    // 如果没有兴趣数据，提示用户选择领域
+                    if (userKeywords.length === 0) {
+                        console.log('暂无关注领域，等待用户选择');
+                    }
+                }
+            } catch (error) {
+                console.error('加载用户兴趣失败:', error);
+            }
+        }
+
+        // 加载预设兴趣分类
+        async function loadPresetCategories() {
+            try {
+                const response = await fetch('/api/user/interests/categories');
+                if (response.ok) {
+                    const result = await response.json();
+                    presetCategories = result.categories || {};
+                    renderPresetCategories();
+                }
+            } catch (error) {
+                console.error('加载预设分类失败:', error);
+            }
+        }
+
+        // 渲染预设分类
+        function renderPresetCategories() {
+            const container = document.getElementById('interest-categories');
+            if (!container) return;
+
+            let html = '';
+            for (const [category, keywords] of Object.entries(presetCategories)) {
+                const isSelected = selectedCategory === category ? 'selected' : '';
+                html += `<span class="category-chip ${isSelected}" onclick="selectCategory('${category}')">${category}</span>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // 选中分类 - 直接将该分类作为兴趣领域
+        async function selectCategory(categoryName) {
+            if (selectedCategory === categoryName) {
+                // 如果已选中，取消关注该分类
+                await unfollowCategory(categoryName);
+                selectedCategory = null;
+            } else {
+                // 关注新分类
+                if (selectedCategory) {
+                    // 先取消之前的分类
+                    await unfollowCategory(selectedCategory);
+                }
+                selectedCategory = categoryName;
+                await followCategory(categoryName);
+            }
+            renderPresetCategories();
+            await refreshUserKeywords();
+        }
+
+        // 关注分类（添加该分类下所有关键词）
+        async function followCategory(categoryName) {
+            try {
+                const response = await fetch('/api/user/interests/follow_category', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        category: categoryName
+                    })
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    showToast(`已关注"${categoryName}"领域（${result.keywords_count}个关键词）`, 'success');
+                }
+            } catch (error) {
+                console.error('关注分类失败:', error);
+            }
+        }
+
+        // 取消关注分类（移除该分类下所有关键词）
+        async function unfollowCategory(categoryName) {
+            try {
+                const response = await fetch('/api/user/interests/unfollow_category', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        category: categoryName
+                    })
+                });
+                if (response.ok) {
+                    showToast(`已取消关注"${categoryName}"`, 'success');
+                }
+            } catch (error) {
+                console.error('取消关注失败:', error);
+            }
+        }
+
+        // 添加兴趣
+        async function addInterest(keyword) {
+            try {
+                await fetch('/api/user/interests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        keyword: keyword,
+                        weight: 2.0
+                    })
+                });
+            } catch (error) {
+                console.error('添加兴趣失败:', error);
+            }
+        }
+
+        // 删除兴趣
+        async function deleteInterest(keyword) {
+            try {
+                await fetch('/api/user/interests/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        keyword: keyword
+                    })
+                });
+            } catch (error) {
+                console.error('删除兴趣失败:', error);
+            }
+        }
+
+        // 清空所有兴趣
+        async function clearAllInterests() {
+            if (!confirm('确定要清空所有兴趣标签吗？')) return;
+
+            try {
+                await fetch('/api/user/interests/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: USER_ID })
+                });
+                userKeywords = [];
+                renderMyInterests();
+                refreshInterestAnalysisCard();
+                clearCategorySelection();
+                showToast('已清空所有兴趣标签', 'success');
+            } catch (error) {
+                console.error('清空兴趣失败:', error);
+            }
+        }
+
+        // 渲染我的兴趣
+        function renderMyInterests() {
+            const container = document.getElementById('my-interests-list');
+            if (!container) return;
+
+            // 用户没有兴趣时，提示选择领域
+            if (userKeywords.length === 0) {
+                container.innerHTML = `
+                    <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 8px;">暂无关注领域</p>
+                    <p style="color: var(--accent-blue); font-size: 11px;">💡 点击上方分类卡片开始关注</p>
+                `;
+                return;
+            }
+
+            // 显示已选的分类名称（从关键词反推分类）
+            let selectedCats = new Set();
+            for (const kw of userKeywords) {
+                for (const [cat, keywords] of Object.entries(presetCategories)) {
+                    if (keywords.includes(kw)) {
+                        selectedCats.add(cat);
+                        break;
+                    }
+                }
+            }
+
+            let html = '<p style="color: var(--accent-blue); font-size: 11px; margin-bottom: 8px;">✅ 已关注领域</p>';
+            for (const cat of selectedCats) {
+                html += `<span class="interest-tag">${cat} <span class="remove-btn" onclick="unselectCategory('${cat}')">×</span></span>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // 取消选中分类
+        async function unselectCategory(categoryName) {
+            const keywords = presetCategories[categoryName] || [];
+            for (const kw of keywords) {
+                if (userKeywords.includes(kw)) {
+                    await deleteInterest(kw);
+                    userKeywords = userKeywords.filter(k => k !== kw);
+                }
+            }
+            if (selectedCategory === categoryName) {
+                selectedCategory = null;
+            }
+            renderMyInterests();
+            renderPresetCategories();
+            refreshInterestAnalysisCard();
+            showToast(`已取消关注"${categoryName}"`, 'success');
+        }
+
+        // 从后端获取最新的用户兴趣标签
+        async function refreshUserKeywords() {
+            try {
+                const response = await fetch(`/api/user/interests?user_id=${USER_ID}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    userKeywords = (data.interests || []).map(i => i.keyword);
+                    console.log(`[兴趣更新] 已更新 ${userKeywords.length} 个兴趣标签:`, userKeywords);
+
+                    // 更新所有相关显示
+                    refreshInterestAnalysisCard();
+                    renderMyInterests();
+                    updateUserInterestsDisplay();
+                }
+            } catch (error) {
+                console.error('获取兴趣标签失败:', error);
+            }
+        }
+
+        // 刷新兴趣分析卡片的标签显示
+        function refreshInterestAnalysisCard() {
+            const interestContent = document.getElementById('interest-content');
+            if (!interestContent) return;
+
+            // 如果兴趣管理器面板是展开的，不更新卡片内容（避免干扰用户操作）
+            const manager = document.getElementById('interest-manager');
+            if (manager && manager.style.display === 'block') {
+                return;
+            }
+
+            if (userKeywords.length === 0) {
+                interestContent.innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <p style="color: var(--text-secondary); margin-bottom: 10px; font-weight: 500;">暂无关注领域</p>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">选择行业领域，定制您的专属舆情</p>
+                        <button onclick="toggleInterestManager()" style="padding: 8px 16px; font-size: 13px;">管理关注领域</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // 更新卡片中的兴趣标签列表
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 15px;">';
+            userKeywords.slice(0, 10).forEach(kw => {
+                html += `<span class="word-tag" style="background: var(--accent-primary); font-size: 12px;" onclick="searchByKeyword('${kw}')">⭐ ${kw}</span>`;
+            });
+            if (userKeywords.length > 10) {
+                html += `<span class="word-tag" style="background: linear-gradient(135deg, #6B7280, #9CA3AF); font-size: 12px;">+${userKeywords.length - 10} 更多</span>`;
+            }
+            html += '</div>';
+            html += '<p style="color: var(--text-secondary); font-size: 12px;">管理面板已收起，点击上方标签可快速搜索 | <a href="javascript:void(0)" onclick="toggleInterestManager()" style="color: var(--accent-blue);">展开管理</a></p>';
+            interestContent.innerHTML = html;
+        }
+
+        // 更新兴趣卡片显示
+        function updateUserInterestsDisplay() {
+            const interestsEl = document.getElementById('user-interests');
+            if (interestsEl && userKeywords.length > 0) {
+                interestsEl.innerHTML = userKeywords.map(kw =>
+                    `<span class="keyword matched">${kw}</span>`
+                ).join('');
+            }
+        }
+
+        // 显示提示消息
+        function showToast(message, type = 'info') {
+            // 创建 toast 元素
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${type === 'success' ? '#10B981' : '#3B82F6'};
+                color: white;
+                padding: 12px 24px;
+                border-radius: 12px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideDown 0.3s ease;
+            `;
+
+            document.body.appendChild(toast);
+
+            // 3 秒后移除
+            setTimeout(() => {
+                toast.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 记录用户点击
+        async function recordClick(newsId, title, source) {
+            try {
+                const response = await fetch('/api/user/click', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        news_id: newsId,
+                        title: title,
+                        source: source
+                    })
+                });
+
+                if (response.ok) {
+                    console.log(`[点击记录] 已记录：${title}`);
+                    // 点击后自动更新兴趣标签
+                    await refreshUserKeywords();
+                    // 重新生成推荐
+                    if (typeof allNews !== 'undefined' && allNews.length > 0) {
+                        generateAIRecommendations(allNews);
+                    }
+                }
+            } catch (err) {
+                console.error('记录点击失败:', err);
+            }
+        }
+
+        // 自动刷新配置
+        const AUTO_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 分钟（毫秒）
+        let refreshCountdown = AUTO_REFRESH_INTERVAL;
+        let lastUpdateTime = null;
+
+        // 更新倒计时显示
+        function updateCountdown() {
+            const minutes = Math.floor(refreshCountdown / 60000);
+            const seconds = Math.floor((refreshCountdown % 60000) / 1000);
+            const countdownEl = document.getElementById('countdown');
+            if (countdownEl) {
+                countdownEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            // 倒计时递减
+            refreshCountdown -= 1000;
+            if (refreshCountdown < 0) {
+                refreshCountdown = AUTO_REFRESH_INTERVAL;
+                // 倒计时归零，触发自动刷新
+                console.log('[自动刷新] 倒计时归零，开始刷新新闻数据和分析模块...');
+                loadNews();
+            }
+        }
+
+        // 更新最后更新时间
+        function updateLastUpdateTime() {
+            lastUpdateTime = new Date();
+            const updateEl = document.getElementById('last-update');
+            if (updateEl) {
+                const hours = lastUpdateTime.getHours().toString().padStart(2, '0');
+                const minutes = lastUpdateTime.getMinutes().toString().padStart(2, '0');
+                const seconds = lastUpdateTime.getSeconds().toString().padStart(2, '0');
+                updateEl.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+        }
+
+        // 启动倒计时定时器
+        setInterval(updateCountdown, 1000);
+
+        // 页面加载时先获取用户兴趣和预设分类
+        Promise.all([loadUserInterests(), loadPresetCategories()]).then(() => {
+            // 然后加载新闻
+            loadNews();
+        });
+
+        async function loadNews() {
+            const container = document.getElementById('news-container');
+            container.innerHTML = '<div class="loading">正在加载新闻数据...</div>';
+
+            try {
+                const response = await fetch('/api/news/by-channel');
+                const data = await response.json();
+                allNews = data;
+                renderNewsByChannel(data);
+
+                // 用户没有兴趣时，提示用户选择领域
+                if (userKeywords.length === 0) {
+                    console.log('[兴趣] 新用户，等待选择关注领域');
+                }
+
+                triggerAIAnalysis(data);
+                updateLastUpdateTime();
+                // 重置倒计时
+                refreshCountdown = AUTO_REFRESH_INTERVAL;
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>⚠️ 加载失败</h3>
+                        <p>无法连接到服务器，请稍后重试</p>
+                        <p style="margin-top: 10px; font-size: 12px;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function triggerAIAnalysis(channels) {
+            let allNews = [];
+            channels.forEach(([channel, priority, newsItems]) => {
+                allNews = allNews.concat(newsItems);
+            });
+
+            console.log(`[AI 分析] 共 ${allNews.length} 条新闻，开始触发 4 个分析模块...`);
+
+            if (allNews.length > 0) {
+                // 并发触发 4 个分析模块，加快响应速度
+                console.log('[AI 分析] 触发 → 关键词云图');
+                analyzeWithAI(allNews);
+
+                console.log('[AI 分析] 触发 → 兴趣匹配分析');
+                analyzeKeywords(allNews);
+
+                console.log('[AI 分析] 触发 → 社交分析');
+                analyzeSocial(allNews);
+
+                console.log('[AI 分析] 触发 → AI 推荐');
+                generateAIRecommendations(allNews);
+
+                console.log('[AI 分析] 4 个分析模块已全部触发');
+            } else {
+                console.warn('[AI 分析] 没有新闻数据，跳过分析');
+            }
+        }
+
+        // 关键词分析
+        async function analyzeKeywords(newsList) {
+            const keywordDiv = document.getElementById('keyword-analysis');
+            const wordCloudContent = document.getElementById('word-cloud-content');
+            const interestDiv = document.getElementById('interest-analysis');
+            const interestContent = document.getElementById('interest-content');
+
+            if (!keywordDiv || !wordCloudContent || !interestDiv || !interestContent) {
+                console.warn('[关键词云图] DOM 元素不存在，跳过分析');
+                return;
+            }
+
+            console.log('[关键词云图] 开始分析...');
+
+            // 显示词云卡片
+            keywordDiv.style.display = 'block';
+            wordCloudContent.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#64748b;">正在生成词云...</div>';
+
+            // 显示兴趣分析卡片
+            interestDiv.style.display = 'block';
+            interestContent.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">正在分析兴趣匹配...</div>';
+
+            try {
+                const response = await fetch('/api/analyze/keywords', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ news: newsList.slice(0, 50) })
+                });
+
+                console.log(`[关键词云图] API 响应状态：${response.status}`);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`[关键词云图] 获取到 ${result.keywords?.length || 0} 个关键词`);
+                    renderWordCloud(result, wordCloudContent);
+                    renderInterestAnalysis(result, newsList, interestContent);
+                    console.log('[关键词云图] 渲染完成 ✅');
+                } else {
+                    console.error(`[关键词云图] API 失败：${response.status}`);
+                    wordCloudContent.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 40px;">词图生成失败</p>';
+                    interestContent.innerHTML = '<p style="color: #94a3b8;">分析暂时不可用</p>';
+                }
+            } catch (error) {
+                console.error(`[关键词云图] 请求失败：${error.message}`);
+                wordCloudContent.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 40px;">词图生成失败</p>';
+                interestContent.innerHTML = '<p style="color: #94a3b8;">分析暂时不可用</p>';
+            }
+        }
+
+        // 渲染词云图
+        function renderWordCloud(result, container) {
+            const keywords = result.keywords || [];
+            const hotTopics = result.hot_topics || [];
+
+            if (keywords.length === 0) {
+                container.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">暂无关键词数据</p>';
+                return;
+            }
+
+            const colorMap = [
+                'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                'linear-gradient(135deg, #7C3AED, #8B5CF6)',
+                'linear-gradient(135deg, #059669, #10B981)',
+                'linear-gradient(135deg, #D97706, #F59E0B)',
+                'linear-gradient(135deg, #DC2626, #EF4444)',
+                'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                'linear-gradient(135deg, #7C3AED, #8B5CF6)',
+                'linear-gradient(135deg, #059669, #10B981)'
+            ];
+            const sizeMap = ['16px', '14px', '13px', '13px', '12px', '12px', '12px', '12px'];
+
+            let html = '';
+            keywords.slice(0, 20).forEach((kw, index) => {
+                const isHot = hotTopics.includes(kw);
+                const color = colorMap[index % colorMap.length];
+                const size = sizeMap[Math.min(index, sizeMap.length - 1)];
+
+                html += `
+                    <span class="word-tag ${isHot ? 'hot' : ''}"
+                          style="background: ${color}; font-size: ${size};"
+                          onclick="searchByKeyword('${kw}')"
+                          title="${isHot ? '🔥 热门话题 ' : ''}点击搜索">
+                        ${isHot ? '🔥 ' : ''}${kw}
+                    </span>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 渲染兴趣匹配分析
+        function renderInterestAnalysis(result, newsList, container) {
+            const userInterests = result.user_interests || [];
+            const keywords = result.keywords || [];
+
+            // 显示兴趣管理入口
+            const manager = document.getElementById('interest-manager');
+            if (manager && userInterests.length > 0) {
+                manager.style.display = 'block';
+                renderMyInterests();
+            } else if (manager) {
+                manager.style.display = 'block';
+                renderMyInterests();
+            }
+
+            if (userInterests.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <p style="color: var(--text-secondary); margin-bottom: 10px; font-weight: 500;">暂无兴趣标签</p>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">从下方选择兴趣分类或手动添加</p>
+                        <button onclick="toggleInterestManager()" style="padding: 8px 16px; font-size: 13px;">管理我的兴趣</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // 计算每个兴趣的匹配度
+            const interestMatches = userInterests.map(interest => {
+                const matchCount = newsList.filter(news =>
+                    news.title && news.title.includes(interest)
+                ).length;
+                const matchPercent = Math.min(100, Math.round((matchCount / Math.max(1, newsList.length)) * 100 * 3));
+                return {
+                    keyword: interest,
+                    count: matchCount,
+                    percent: matchPercent
+                };
+            }).sort((a, b) => b.count - a.count);
+
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 15px;">';
+            userInterests.forEach(kw => {
+                html += `<span class="word-tag" style="background: var(--accent-primary); font-size: 12px;" onclick="searchByKeyword('${kw}')">⭐ ${kw}</span>`;
+            });
+            html += '</div>';
+
+            html += '<div>';
+            interestMatches.forEach((item, index) => {
+                const barClass = item.percent >= 60 ? 'high' : item.percent >= 30 ? 'medium' : 'low';
+                html += `
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                            <span style="color: var(--text-primary); font-weight: 500;">${item.keyword}</span>
+                            <span style="color: var(--text-secondary);">${item.count} 篇</span>
+                        </div>
+                        <div class="interest-bar" style="width: ${item.percent}%; position: relative;">
+                            <div class="interest-bar-fill ${barClass}" style="width: 100%;"></div>
+                            <span class="interest-bar-text">${item.percent}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            container.innerHTML = html;
+
+            // 同时更新兴趣分析卡片的简化视图（当管理面板收起时显示）
+            refreshInterestAnalysisCard();
+        }
+
+        // AI 推荐
+        async function generateAIRecommendations(newsList) {
+            const recommendDiv = document.getElementById('ai-recommend');
+            const recommendContent = document.getElementById('recommend-content');
+
+            if (!recommendDiv || !recommendContent) {
+                console.warn('[AI 推荐] DOM 元素不存在，跳过分析');
+                return;
+            }
+
+            console.log('[AI 推荐] 开始生成推荐...');
+
+            recommendDiv.style.display = 'block';
+            recommendContent.innerHTML = '<div class="ai-loading">正在生成推荐...</div>';
+
+            try {
+                // 调用混合推荐 API（协同过滤 + 内容推荐 + 实时热度）
+                const response = await fetch('/api/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        news: newsList.slice(0, 50),
+                        history: userHistory.slice(-20),
+                        use_external_api: true  // 明确使用外部推荐 API
+                    })
+                });
+
+                console.log(`[AI 推荐] API 响应状态：${response.status}`);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`[AI 推荐] 获取到 ${result.recommendations?.length || 0} 条推荐，来源：${result.source || 'unknown'}`);
+                    renderRecommendations(result, recommendContent);
+                    console.log('[AI 推荐] 渲染完成 ✅');
+                } else {
+                    console.error(`[AI 推荐] API 失败：${response.status}`);
+                    recommendContent.innerHTML = '<p style="color: #94a3b8; font-size: 13px;">AI 推荐暂时不可用</p>';
+                }
+            } catch (error) {
+                console.error(`[AI 推荐] 请求失败：${error.message}`);
+                recommendContent.innerHTML = '<p style="color: #94a3b8; font-size: 13px;">AI 推荐暂时不可用</p>';
+            }
+        }
+
+        function renderRecommendations(result, container) {
+            const recommendations = result.recommendations || [];
+
+            if (recommendations.length === 0) {
+                container.innerHTML = '<p style="color: #94a3b8; font-size: 13px;">暂无个性化推荐</p>';
+                return;
+            }
+
+            let html = '<div class="recommend-list">';
+            recommendations.slice(0, 5).forEach((rec, index) => {
+                if (!rec) return; // 空值保护
+                const title = rec.title || '推荐内容';
+                const score = rec.score || 0.9;
+                const reason = rec.reason || '根据您的兴趣推荐';
+                const link = rec.link || '#';
+                const sourceName = rec.source_name || '';
+                const newsId = rec.news_id || 'rec_' + index; // 使用返回的 news_id，如果没有则用索引
+
+                html += `
+                    <div class="recommend-item">
+                        <a href="${link}" target="_blank" class="recommend-title-link" onclick="recordClick('${newsId}', '${title.replace(/'/g, "\\'")}', '${sourceName}')">
+                            <span>${title}</span>
+                        </a>
+                        <span class="recommend-score">${score}</span>
+                        <div class="recommend-reason">${reason}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // 社交分析
+        async function analyzeSocial(newsList) {
+            const socialDiv = document.getElementById('social-analysis');
+            const socialContent = document.getElementById('social-content');
+
+            if (!socialDiv || !socialContent) {
+                console.warn('[社交分析] DOM 元素不存在，跳过分析');
+                return;
+            }
+
+            console.log('[社交分析] 开始分析...');
+
+            socialDiv.style.display = 'block';
+            socialContent.innerHTML = '<div class="ai-loading">正在分析社交数据...</div>';
+
+            try {
+                // 调用外部社交 API，获取微博、知乎、微信、Twitter 实时数据
+                const response = await fetch('/api/analyze/social', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        news: newsList.slice(0, 50),
+                        use_external_api: true  // 明确使用外部 API
+                    })
+                });
+
+                console.log(`[社交分析] API 响应状态：${response.status}`);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`[社交分析] 获取到指标数据：${JSON.stringify(result.metrics)}`);
+                    console.log(`[社交分析] 数据来源：${result.metrics.source || 'unknown'}`);
+                    renderSocialAnalysis(result, socialContent);
+                    console.log('[社交分析] 渲染完成 ✅');
+                } else {
+                    console.error(`[社交分析] API 失败：${response.status}`);
+                    socialContent.innerHTML = '<p style="color: #94a3b8; font-size: 13px;">社交分析暂时不可用</p>';
+                }
+            } catch (error) {
+                console.error(`[社交分析] 请求失败：${error.message}`);
+                socialContent.innerHTML = '<p style="color: #94a3b8; font-size: 13px;">社交分析暂时不可用</p>';
+            }
+        }
+
+        function renderSocialAnalysis(result, container) {
+            const metrics = result.metrics || {};
+            const trends = result.trends || [];
+            const viralTopics = result.viral_topics || [];
+
+            let html = `
+                <div class="social-metrics">
+                    <div class="social-metric">
+                        <div class="metric-value">${metrics.total_engagement || 0}</div>
+                        <div class="metric-label">总互动量</div>
+                    </div>
+                    <div class="social-metric">
+                        <div class="metric-value">${metrics.viral_count || 0}</div>
+                        <div class="metric-label">病毒传播</div>
+                    </div>
+                    <div class="social-metric">
+                        <div class="metric-value">${metrics.sentiment_score || 0}</div>
+                        <div class="metric-label">情感得分</div>
+                    </div>
+                    <div class="social-metric">
+                        <div class="metric-value">${metrics.trend_velocity || 0}</div>
+                        <div class="metric-label">传播速度</div>
+                    </div>
+                </div>
+            `;
+
+            // 显示病毒话题
+            if (viralTopics.length > 0) {
+                html += '<div class="social-trend"><strong style="color: #8B5CF6; font-size: 12px;">🔥 病毒话题</strong>';
+                viralTopics.forEach((topic, index) => {
+                    html += `
+                        <div class="social-trend-item" style="padding: 8px 0;">
+                            <span class="social-trend-name" style="font-size: 12px;">${index + 1}. ${topic.topic}</span>
+                            <span class="trend-engagement" style="font-size: 11px;">热度 ${topic.hot_score}</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            if (trends.length > 0) {
+                html += '<div class="social-trend" style="margin-top: 10px;"><strong style="color: #8B5CF6; font-size: 12px;">📈 社交趋势</strong>';
+                trends.slice(0, 3).forEach(trend => {
+                    html += `
+                        <div class="social-trend-item">
+                            <span class="social-trend-name">${trend.topic}</span>
+                            <span class="trend-engagement">${trend.engagement} 互动</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function searchByKeyword(keyword) {
+            document.getElementById('search-input').value = keyword;
+            searchNews();
+        }
+
+        async function searchNews() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) {
+                loadNews();
+                return;
+            }
+
+            const container = document.getElementById('news-container');
+            container.innerHTML = '<div class="loading">正在搜索...</div>';
+
+            try {
+                // 使用浏览器实时搜索（source=all 表示搜索所有来源）
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&source=browser&limit=50`);
+                const data = await response.json();
+                const channels = [['搜索结果', 'all', data]];
+                renderNewsByChannel(channels);
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>⚠️ 搜索失败</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function analyzeWithAI(newsList) {
+            if (newsList.length === 0) {
+                console.warn('[AI 分析] 没有新闻数据，跳过分析');
+                return;
+            }
+
+            console.log('[AI 分析] 开始深度分析...');
+
+            const aiDiv = document.getElementById('ai-analysis');
+            const insightsContainer = document.getElementById('insights-container');
+            const analysisBadge = document.getElementById('analysis-badge');
+
+            aiDiv.style.display = 'block';
+
+            // 加载状态
+            insightsContainer.innerHTML = `
+                <div class="insight-item">
+                    <span class="insight-priority priority-medium">分析中</span>
+                    <div class="insight-title">AI 正在深度解析资讯内容</div>
+                    <div class="insight-desc">正在提取关键信息、识别实体、分析情感倾向，请稍候...</div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ news: newsList.slice(0, 20) })
+                });
+
+                console.log(`[AI 分析] API 响应状态：${response.status}`);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`[AI 分析] 分析类型：${result.analysis_type}`);
+
+                    // 更新徽章
+                    if (analysisBadge) {
+                        analysisBadge.textContent = result.analysis_type === 'ai_deep' ? '深度分析' : '快速分析';
+                        analysisBadge.style.background = result.analysis_type === 'ai_deep'
+                            ? 'linear-gradient(135deg, #0ea5e9 0%, #3B82F6 100%)'
+                            : 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)';
+                    }
+
+                    // 填充简报内容
+                    renderAIBrief(result);
+
+                    console.log('[AI 分析] 渲染完成 ✅');
+                } else {
+                    console.error(`[AI 分析] API 失败：${response.status}`);
+                    const error = await response.json();
+                    insightsContainer.innerHTML = `
+                        <div class="insight-item">
+                            <span class="insight-priority priority-high">分析失败</span>
+                            <div class="insight-title">无法完成 AI 分析</div>
+                            <div class="insight-desc">${error.error || '未知错误'}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error(`[AI 分析] 请求失败：${error.message}`);
+                insightsContainer.innerHTML = `
+                    <div class="insight-item">
+                        <span class="insight-priority priority-high">请求失败</span>
+                        <div class="insight-title">无法连接到 AI 服务</div>
+                        <div class="insight-desc">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // 渲染 AI 简报
+        function renderAIBrief(result) {
+            // 1. 更新关键指标
+            updateMetrics(result);
+
+            // 2. 渲染核心洞察
+            renderInsights(result);
+
+            // 3. 渲染快速统计
+            renderQuickStats(result);
+
+            // 4. 渲染建议行动
+            renderActionItems(result);
+        }
+
+        function updateMetrics(result) {
+            // 情感倾向
+            const sentimentEl = document.getElementById('metric-sentiment');
+            const sentimentTrendEl = document.getElementById('sentiment-trend');
+            if (result.sentiment) {
+                const sentimentMap = {
+                    'positive': { text: '积极', trend: 'trend-up', trendText: '↑ 向好' },
+                    'negative': { text: '消极', trend: 'trend-down', trendText: '↓ 关注' },
+                    'neutral': { text: '中性', trend: 'trend-neutral', trendText: '→ 平稳' }
+                };
+                const s = sentimentMap[result.sentiment] || sentimentMap.neutral;
+                if (sentimentEl) sentimentEl.textContent = s.text;
+                if (sentimentTrendEl) {
+                    sentimentTrendEl.className = `metric-badge-trend ${s.trend}`;
+                    sentimentTrendEl.textContent = s.trendText;
+                }
+            }
+
+            // 关键主题数量
+            const topicsEl = document.getElementById('metric-topics');
+            if (result.topics_count !== undefined) {
+                topicsEl.textContent = result.topics_count;
+            }
+
+            // 信息密度
+            const densityEl = document.getElementById('metric-density');
+            if (result.info_density !== undefined) {
+                densityEl.textContent = (result.info_density * 100).toFixed(0) + '%';
+            }
+
+            // 风险等级
+            const riskEl = document.getElementById('metric-risk');
+            if (result.risk_level) {
+                riskEl.textContent = result.risk_level;
+            }
+        }
+
+        function renderInsights(result) {
+            const container = document.getElementById('insights-container');
+            if (!container) return;
+
+            const insights = result.insights || [];
+            if (insights.length === 0) {
+                container.innerHTML = `
+                    <div class="insight-item">
+                        <span class="insight-priority priority-medium">待分析</span>
+                        <div class="insight-title">暂无核心洞察</div>
+                        <div class="insight-desc">AI 正在学习资讯内容，稍后将为您提供深度分析。</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            insights.forEach((insight, index) => {
+                const priority = insight.priority || 'medium';
+                const priorityClass = priority === 'high' ? 'priority-high' : priority === 'low' ? 'priority-low' : 'priority-medium';
+                const priorityText = priority === 'high' ? '高优先级' : priority === 'low' ? '一般关注' : '重点关注';
+
+                html += `
+                    <div class="insight-item">
+                        <span class="insight-priority ${priorityClass}">${priorityText}</span>
+                        <div class="insight-title">${insight.title || '关键洞察'}</div>
+                        <div class="insight-desc">${insight.description || insight.content || ''}</div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderQuickStats(result) {
+            // 字数统计
+            const wordsEl = document.getElementById('stat-words');
+            if (wordsEl && result.word_count !== undefined) {
+                wordsEl.textContent = result.word_count.toLocaleString();
+            }
+
+            // 实体识别
+            const entitiesEl = document.getElementById('stat-entities');
+            if (entitiesEl && result.entities_count !== undefined) {
+                entitiesEl.textContent = result.entities_count;
+            }
+
+            // 关键词数量
+            const keywordsEl = document.getElementById('stat-keywords');
+            if (keywordsEl && result.keywords_count !== undefined) {
+                keywordsEl.textContent = result.keywords_count;
+            }
+
+            // 情感得分
+            const scoreEl = document.getElementById('stat-score');
+            if (scoreEl && result.sentiment_score !== undefined) {
+                scoreEl.textContent = result.sentiment_score.toFixed(2);
+            }
+        }
+
+        function renderActionItems(result) {
+            const container = document.getElementById('action-list');
+            if (!container) return;
+
+            const actions = result.actions || result.suggested_actions || [];
+            if (actions.length === 0) {
+                container.innerHTML = '<li>暂无建议行动项</li>';
+                return;
+            }
+
+            let html = '';
+            actions.forEach((action, index) => {
+                if (index < 5) { // 最多显示 5 条
+                    html += `<li>${action}</li>`;
+                }
+            });
+            container.innerHTML = html;
+        }
+
+        function filterSentiment(sentiment, btn) {
+            currentFilter = sentiment;
+
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            loadNewsWithFilter(sentiment);
+        }
+
+        async function loadNewsWithFilter(sentiment) {
+            const container = document.getElementById('news-container');
+            container.innerHTML = '<div class="loading">正在加载新闻数据...</div>';
+
+            try {
+                const response = await fetch('/api/news/by-channel');
+                const data = await response.json();
+
+                if (sentiment === 'all') {
+                    renderNewsByChannel(data);
+                } else {
+                    const filtered = data.map(([channel, priority, newsList]) => {
+                        const filteredList = newsList.filter(n => n.sentiment === sentiment);
+                        return [channel, priority, filteredList];
+                    }).filter(([_, __, newsList]) => newsList.length > 0);
+                    renderNewsByChannel(filtered);
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>⚠️ 加载失败</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderNewsByChannel(channels) {
+            const container = document.getElementById('news-container');
+
+            if (!channels || channels.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>📭 暂无数据</h3>
+                        <p>还没有新闻数据，请点击"刷新"按钮采集</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            channels.forEach(([channelName, priority, newsList]) => {
+                html += renderChannelCard(channelName, priority, newsList);
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderChannelCard(channelName, priority, newsList) {
+            if (!newsList || newsList.length === 0) {
+                return '';
+            }
+
+            return `
+                <div class="channel-card">
+                    <div class="channel-header">
+                        <div class="channel-name">
+                            <span>${channelName}</span>
+                        </div>
+                        <div class="channel-count">${newsList.length} 条</div>
+                    </div>
+                    <div class="channel-news-list">
+                        ${newsList.map(news => renderNewsItem(news)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNewsItem(news) {
+            const link = news.link || '#';
+            const hasTranslation = news.lang === 'en' && news.original_title;
+            const displayTitle = hasTranslation && showTranslation ? news.title : (news.original_title || news.title);
+            const showOriginal = hasTranslation && !showTranslation;
+
+            return `
+                <div class="news-item">
+                    <div class="news-item-content">
+                        <span class="sentiment-badge sentiment-${news.sentiment || 'neutral'}">
+                            ${news.sentiment || 'neutral'}
+                        </span>
+                        <a href="${link}" target="_blank" class="news-item-title" title="${displayTitle || ''}" onclick="recordClick(${news.news_id || 0}, '${(displayTitle || '').replace(/'/g, "\\'")}', '${news.source || ''}')">${displayTitle}</a>
+                        ${hasTranslation && showTranslation ? '<span class="trans-badge">译</span>' : ''}
+                    </div>
+                    <div class="news-item-meta">
+                        <span class="news-item-date">${formatPublishedTime(news.published)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatPublishedTime(published) {
+            if (!published) return '';
+            try {
+                // 将 "YYYY-MM-DD HH:mm:ss" 格式转换为本地时间解析
+                // 避免浏览器将其误判为 UTC 时间导致时差问题
+                const parts = published.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+                if (!parts) return published;
+
+                const date = new Date(
+                    parseInt(parts[1]),
+                    parseInt(parts[2]) - 1,
+                    parseInt(parts[3]),
+                    parseInt(parts[4]),
+                    parseInt(parts[5]),
+                    parseInt(parts[6])
+                );
+
+                const now = new Date();
+                const diff = (now - date) / 1000;
+
+                if (diff < 60) return '刚刚';
+                if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+                if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+                return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+            } catch (e) {
+                return published;
+            }
+        }
+
+        function toggleTranslation() {
+            showTranslation = document.getElementById('translate-toggle').checked;
+            loadNews();
+        }
+
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchNews();
+            }
+        });
+
+        // 定时刷新：每 10 分钟自动刷新一次（通过倒计时触发）
+        // 注：不再使用 setInterval 重复触发，而是由 updateCountdown 在倒计时归零时触发
+    </script>
+</body>
+</html>

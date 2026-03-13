@@ -217,7 +217,7 @@ def save_news(news_list):
 
 def get_news(limit=300, offset=0):
     """
-    查询最新新闻
+    查询最新新闻（按时间倒序，published 为空时使用 created_at）
     :param limit: 数量限制
     :param offset: 偏移量
     :return: 新闻列表
@@ -236,7 +236,7 @@ def get_news(limit=300, offset=0):
                 WHEN 'overseas' THEN 2
                 ELSE 3
             END,
-            published DESC
+            COALESCE(published, created_at) DESC
         LIMIT ? OFFSET ?
     ''', (limit, offset))
 
@@ -309,7 +309,7 @@ def get_news_by_channel(channel_limit=15):
                    hot_score, link, lang, content, priority
             FROM news
             WHERE source = ?
-            ORDER BY published DESC
+            ORDER BY COALESCE(published, created_at) DESC
             LIMIT ?
         ''', (source, channel_limit))
 
@@ -365,7 +365,7 @@ def get_news_by_keywords(keywords, limit=100):
                hot_score, link, lang, content, priority
         FROM news
         WHERE {conditions}
-        ORDER BY published DESC
+        ORDER BY COALESCE(published, created_at) DESC
         LIMIT ?
     ''', params)
 
@@ -639,6 +639,15 @@ def decrease_user_interest(user_id, keyword, decay=0.1):
     conn.close()
 
 
+def clear_user_interests(user_id='default'):
+    """清除用户所有兴趣标签"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM user_interests WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+
 def record_user_click(user_id, news_id, title, source):
     """记录用户点击行为"""
     conn = get_db_connection()
@@ -762,7 +771,7 @@ def get_personalized_news(user_id='default', channel_limit=15):
                    ({interest_score}) as interest_score
             FROM news
             WHERE source = ?
-            ORDER BY interest_score DESC, published DESC
+            ORDER BY interest_score DESC, COALESCE(published, created_at) DESC
             LIMIT ?
         ''', (source, channel_limit))
 
@@ -784,6 +793,7 @@ _original_init_db = init_db
 
 # 预设兴趣分类 - 面向 5000 万 -5 亿规模传统行业中小企业
 PRESET_INTEREST_CATEGORIES = {
+    "科技领域": ["创业", "startups", "融资", "风险投资", "天使投资", "孵化器", "加速器", "科技创新", "硬科技", "科创", "科技创业", "创始人", "CEO", "科技融资", "科技投资", "股权投资", "Pre-A 轮", "A 轮", "B 轮", "C 轮", "D 轮", "IPO", "上市", "科创板", "创业板"],
     "宏观政策": ["政策", "法规", "税收", "补贴", "监管", "产业支持", "专精特新", "中小企业", "营商环境", "外贸", "出口", "进口", "关税", "信贷", "融资支持"],
     "行业趋势": ["转型", "数字化", "智能化", "升级", "创新", "技术突破", "国产替代", "供应链", "产业链", "产业集群", "行业报告", "市场分析", "竞争格局"],
     "经营管理": ["管理", "组织", "人才", "招聘", "培训", "绩效", "激励", "股权", "薪酬", "企业文化", "团队建设", "领导力", "战略", "商业模式"],

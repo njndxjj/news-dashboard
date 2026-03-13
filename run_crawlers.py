@@ -8,6 +8,7 @@ from database import save_news, init_db
 import time
 import json
 import os
+import sqlite3
 from datetime import datetime
 import urllib.request
 
@@ -25,8 +26,19 @@ crawlers = [
 
 async def run_all_crawlers():
     """异步运行所有爬虫"""
-    # 确保数据库已初始化
-    init_db()
+    # 确保数据库已初始化（带重试机制）
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            init_db()
+            break
+        except sqlite3.OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries - 1:
+                print(f'数据库被锁定，等待 3 秒后重试... (尝试 {attempt + 1}/{max_retries})')
+                time.sleep(3)
+            else:
+                raise
 
     results = []
     total_saved = 0

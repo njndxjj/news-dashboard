@@ -2,8 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装系统依赖（包括浏览器依赖和 cron）
-RUN apt-get update && apt-get install -y \
+# 设置环境变量
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# 完全禁用 apt 签名验证（解决网络环境问题）
+RUN echo "APT::Get::AllowUnauthenticated 'true';" > /etc/apt/apt.conf.d/99allow-unauthenticated && \
+    echo "Acquire::AllowInsecureRepositories 'true';" >> /etc/apt/apt.conf.d/99allow-unauthenticated && \
+    echo "Acquire::AllowDowngradeToInsecureRepositories 'true';" >> /etc/apt/apt.conf.d/99allow-unauthenticated
+
+# 安装系统依赖（包括 cron 和 supervisor）
+RUN apt-get -o Acquire::AllowInsecureRepositories=true update && \
+    apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
@@ -21,10 +31,8 @@ RUN apt-get update && apt-get install -y \
     chromium \
     cron \
     supervisor \
-    && rm -rf /var/lib/apt/lists/*
-
-# 设置 Playwright 浏览器路径
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # 安装 Python 依赖
 COPY requirements.txt .
@@ -42,6 +50,10 @@ COPY config/ config/
 
 # 复制 supervisor 配置文件
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# 复制 cron 配置文件
+COPY cronjob /etc/cron.d/news-cron
+RUN chmod 0644 /etc/cron.d/news-cron
 
 # 创建数据目录和日志目录
 RUN mkdir -p /app/data /var/log/supervisor

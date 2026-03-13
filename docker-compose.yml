@@ -1,17 +1,17 @@
-version: '3.8'
-
 services:
   news-monitor:
-    build: .
+    image: news-monitor-with-cron:latest
     container_name: news-monitor-app
     ports:
       - "5000:5000"
     volumes:
       # 数据持久化（重要：保存数据库和缓存）
       - ./data:/app/data
-      # 挂载 cron 配置文件
-      - ./cronjob:/etc/cron.d/news-cron:ro
+      # 挂载 supervisor socket 便于调试
+      - /var/run/supervisor:/var/run/supervisor
     restart: unless-stopped
+    # 使用 supervisord 启动 cron 和 Flask
+    command: ["supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
     environment:
       - PYTHONUNBUFFERED=1
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
