@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumos 舆情监控与推荐系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Lumos 舆情监控与推荐系统</h1>
+            <nav>
+                <button id="newsTab" class="tab-btn active" data-tab="news">新闻列表</button>
+                <button id="trendingTab" class="tab-btn" data-tab="trending">热门新闻</button>
+                <button id="searchTab" class="tab-btn" data-tab="search">搜索</button>
+                <button id="categoriesTab" class="tab-btn" data-tab="categories">分类</button>
+                <button id="sourcesTab" class="tab-btn" data-tab="sources">新闻源</button>
+                <button id="recommendTab" class="tab-btn" data-tab="recommend">推荐</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- 新闻列表 -->
+            <section id="newsSection" class="tab-content active">
+                <div class="controls">
+                    <input type="number" id="newsLimit" placeholder="限制数量" value="20">
+                    <select id="newsCategory">
+                        <option value="">全部分类</option>
+                    </select>
+                    <select id="newsSource">
+                        <option value="">全部来源</option>
+                    </select>
+                    <button id="refreshNews">刷新</button>
+                </div>
+                <div id="newsList" class="article-grid"></div>
+                <div id="newsPagination" class="pagination"></div>
+            </section>
+
+            <!-- 热门新闻 -->
+            <section id="trendingSection" class="tab-content">
+                <div class="controls">
+                    <input type="number" id="trendingLimit" placeholder="限制数量" value="10">
+                    <button id="refreshTrending">刷新</button>
+                </div>
+                <div id="trendingList" class="article-grid"></div>
+            </section>
+
+            <!-- 搜索 -->
+            <section id="searchSection" class="tab-content">
+                <div class="controls">
+                    <input type="text" id="searchInput" placeholder="输入搜索关键词">
+                    <input type="number" id="searchLimit" placeholder="限制数量" value="10">
+                    <button id="searchBtn">搜索</button>
+                </div>
+                <div id="searchResults" class="article-grid"></div>
+            </section>
+
+            <!-- 分类 -->
+            <section id="categoriesSection" class="tab-content">
+                <div id="categoriesList" class="categories-grid"></div>
+            </section>
+
+            <!-- 新闻源 -->
+            <section id="sourcesSection" class="tab-content">
+                <div id="sourcesList" class="sources-grid"></div>
+            </section>
+
+            <!-- 推荐 -->
+            <section id="recommendSection" class="tab-content">
+                <div class="controls">
+                    <input type="number" id="recommendLimit" placeholder="限制数量" value="10">
+                    <button id="refreshRecommend">刷新</button>
+                </div>
+                <div id="recommendList" class="article-grid"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Lumos 舆情监控与推荐系统 &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

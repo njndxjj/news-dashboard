@@ -1,0 +1,9 @@
+# Lumos 系统定时任务配置
+# 新闻采集任务 - 每 10 分钟运行一次
+*/10 * * * * cd /Users/bs-00008898/OpenClaw_Data/Lumos && /usr/bin/python3 run_crawlers.py >> /Users/bs-00008898/OpenClaw_Data/Lumos/logs/news_crawl.log 2>&1
+
+# 推荐算法更新 - 每小时运行一次
+0 * * * * cd /Users/bs-00008898/OpenClaw_Data/Lumos && /usr/bin/python3 -c "import sys; sys.path.append('/Users/bs-00008898/OpenClaw_Data/Lumos'); from recommendation_engine import update_recommendations_for_all_users; update_recommendations_for_all_users()" >> /Users/bs-00008898/OpenClaw_Data/Lumos/logs/recommendation_update.log 2>&1
+
+# 数据清理任务 - 每天凌晨 2 点运行
+0 2 * * * cd /Users/bs-00008898/OpenClaw_Data/Lumos && /usr/bin/python3 -c "import sys; sys.path.append('/Users/bs-00008898/OpenClaw_Data/Lumos'); from database import cleanup_old_records; from datetime import datetime, timedelta; cleanup_old_records(datetime.now() - timedelta(days=7))" >> /Users/bs-00008898/OpenClaw_Data/Lumos/logs/data_cleanup.log 2>&1

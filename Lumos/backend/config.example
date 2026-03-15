@@ -1,0 +1,15 @@
+# Snowflake Worker ID 配置
+# 每台服务器必须配置唯一的 worker_id（0-1023）
+# 可通过以下方式之一设置：
+
+# 方式 1: 环境变量（推荐）
+# 在服务器启动前设置：export SNOWFLAKE_WORKER_ID=1
+
+# 方式 2: 修改此文件
+WORKER_ID=1
+
+# 服务器部署说明：
+# - Server 1: WORKER_ID=1
+# - Server 2: WORKER_ID=2
+# - Server 3: WORKER_ID=3
+# ... 最多支持 1024 台服务器

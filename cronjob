@@ -1,8 +1,0 @@
-# 每 10 分钟执行一次爬虫更新
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-
-# 定时任务：每 10 分钟执行
-*/10 * * * * root echo "=== CRON START: $(date) ===" >> /app/data/cron.log && cd /app && /usr/local/bin/python run_crawlers.py >> /app/data/cron.log 2>&1 && echo "=== CRON END: $(date) ===" >> /app/data/cron.log
-# 启动时立即执行一次
-@reboot root sleep 5 && echo "=== CRON REBOOT: $(date) ===" >> /app/data/cron.log && cd /app && /usr/local/bin/python run_crawlers.py >> /app/data/cron.log 2>&1 && echo "=== CRON REBOOT END: $(date) ===" >> /app/data/cron.log

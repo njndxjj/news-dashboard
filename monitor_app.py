@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request
+from flask_cors import CORS
 import feedparser
 import datetime
 import hashlib
@@ -12,19 +13,21 @@ import yaml
 from functools import lru_cache
 from collections import Counter, defaultdict
 import logging
+from Lumos.backend.user_module import user_bp
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # 通义千问 API 配置
-DASHSCOPE_API_KEY = os.environ.get('DASHSCOPE_API_KEY', '')
+DASHSCOPE_API_KEY = os.environ.get('DASHSCOPE_API_KEY', 'sk-1acde23fddbd4a83bd0aa451a6a60a47')
 
 # 飞书 Webhook 配置
 FEISHU_WEBHOOK = os.environ.get('FEISHU_WEBHOOK', '')
 # 浏览器搜索配置
-BROWSER_SEARCH_ENABLED = os.environ.get('BROWSER_SEARCH_ENABLED', 'true').lower() == 'true'  # 是否启用浏览器搜索
-PROXY_SERVER = os.environ.get('PROXY_SERVER', None)  # 代理服务器地址
+BROWSER_SEARCH_ENABLED = os.environ.get('BROWSER_SEARCH_ENABLED', 'false').lower() == 'true'  # 是否启用浏览器搜索
+# AI 智能分析配置
+AI_ANALYSIS_SOURCE = os.environ.get('AI_ANALYSIS_SOURCE', 'browser')  # 分析数据源：'browser' (浏览器搜索) 或 'rss' (RSS/爬虫)
 
 
 # ==================== 智能分析模块 - 增强版 ====================
@@ -205,6 +208,12 @@ def build_user_vector(history, interests, recent_weight=1.5):
 
 app = Flask(__name__, template_folder='templates')
 
+# 启用 CORS，允许所有来源访问（仅用于本地测试）
+CORS(app)
+
+# 注册 user_module 蓝图
+app.register_blueprint(user_bp)
+
 # 导入数据库和推送模块
 from database import (
     init_db, get_news, get_hot_news, get_news_by_keywords, save_news,
@@ -212,7 +221,8 @@ from database import (
     get_push_logs, get_setting, update_setting, get_all_settings,
     get_news_count, get_latest_published, save_push_log, get_news_by_channel,
     get_user_interests, record_user_click, get_user_click_history, get_personalized_news,
-    PRESET_INTEREST_CATEGORIES, add_user_interest, get_db_connection, clear_user_interests
+    PRESET_INTEREST_CATEGORIES, add_user_interest, get_db_connection, clear_user_interests,
+    save_ai_analysis, get_ai_analysis
 )
 from feishu_push import (
     send_feishu_message, format_single_news_card, format_breaking_news_batch,
@@ -333,10 +343,10 @@ print(f"另有 {len(CRAWLER_IMPLEMENTED)} 个平台通过爬虫获取")
 # 缓存数据
 cached_news = []
 last_update = None
-ai_analysis_cache = None  # AI 分析结果缓存
+# ai_analysis_cache 已废弃，现在每次用户刷新都重新分析
 
 def ai_deep_analysis(news_list):
-    """使用通义千问进行深度 AI 分析"""
+    """使用通义千问进行深度 AI 分析 - 基于实时热点数据的智能摘要总结"""
     logger.info(f"[AI 分析] DASHSCOPE_API_KEY 长度：{len(DASHSCOPE_API_KEY) if DASHSCOPE_API_KEY else 0}")
 
     if not DASHSCOPE_API_KEY:
@@ -351,62 +361,128 @@ def ai_deep_analysis(news_list):
         dashscope.api_key = DASHSCOPE_API_KEY
         logger.info(f"[AI 分析] 开始调用通义千问 API，dashscope.api_key 长度：{len(dashscope.api_key)}")
 
-        # 准备分析的新闻数据（精选 20 条代表性新闻）
-        精选新闻 = news_list[:20]
+        # 准备分析的新闻数据（精选 30-50 条代表性新闻）
+        精选新闻 = news_list[:50]
         news_summary = "\n".join([
-            f"- [{n.get('source', '未知')}] {n.get('title', '')} ({n.get('original_title') or n.get('title', '')})"
+            f"- [{n.get('source', '未知')}] {n.get('title', '')} (热度：{n.get('hot_score') or 50})"
             for n in 精选新闻
         ])
 
-        # 构建分析提示词（专家视角，面向高管汇报）
-        prompt = f"""你是一位资深商业情报专家，正在为企业高管和决策者撰写舆情分析报告。请基于以下最新新闻进行高度概括和深度分析：
+        # 统计来源分布
+        sources = [n.get('source', '未知') for n in 精选新闻]
+        source_stats = {}
+        for s in sources:
+            source_stats[s] = source_stats.get(s, 0) + 1
+        source_text = "，".join([f"{k}({v}条)" for k, v in source_stats.items()])
 
+        # 构建分析提示词（高管视角 + 行业研究员视角，聚焦摘要总结）
+        prompt = f"""你是一位资深商业情报分析师和舆情专家，正在为企业高管和决策者撰写每日舆情摘要报告。
+
+**数据来源**：{source_text}
+**分析样本**：共 {len(精选新闻)} 条实时热点新闻
+
+**新闻内容**：
 {news_summary}
 
 **报告定位**：
-- 受众：企业老板、高管、战略观察员
-- 风格：专业、精炼、有洞察力，避免冗余信息
-- 目标：让决策者在 3 分钟内掌握核心动态和关键行动点
+- 受众：企业 CEO、高管、战略决策者、投资人
+- 场景：每日晨会、快速决策参考、战略风向标
+- 风格：专业、精准、高度凝练、有数据支撑、有前瞻洞察
+- 目标：让决策者在 2 分钟内掌握核心动态和关键行动点
 
-请输出 JSON 格式的分析报告，包含以下字段：
+请输出 JSON 格式的摘要报告，必须包含以下字段：
+
 {{
-    "executive_summary": "100 字以内的核心摘要，高度概括，直击要点，让高管一眼看懂当前局势",
-    "sentiment_analysis": {{
-        "overall": "positive/neutral/negative",
-        "positive_rate": 0.0-1.0,
-        "key_drivers": ["正面驱动因素 1", "正面驱动因素 2", ...]
-    }},
-    "trend_insights": [
-        {{"trend": "趋势名称", "confidence": "high/medium/low", "evidence": "支撑证据（具体新闻事件）", "impact": "对本企业的潜在影响"}}
+    "executive_summary": "150 字以内的核心摘要，高度概括当前舆情态势。要求：① 直击要点 ② 有数据支撑 ③ 体现情报价值 ④ 让高管一眼看懂全局",
+
+    "key_highlights": [
+        "重要事件 1（30 字以内，精准描述）",
+        "重要事件 2（30 字以内）",
+        "重要事件 3（30 字以内）"
     ],
-    "competitive_intelligence": [
-        {{"company": "公司/机构名", "action": "关键动态/战略举措", "implication": "对我方的启示或威胁"}}
+
+    "trending_topics": [
+        {{
+            "topic": "热点话题名称（5-15 字，精准提炼）",
+            "description": "一句话描述（20-30 字，说明核心进展）",
+            "heat_level": "very_high/high/medium/low",
+            "related_news_count": 相关新闻数量（整数）
+        }}
     ],
-    "risk_warnings": [
-        {{"risk": "风险描述（具体且可操作）", "severity": "high/medium/low", "suggestion": "应对建议（可落地的行动方案）"}}
+
+    "industry_insights": [
+        {{
+            "trend": "行业趋势或重大动态（精准描述）",
+            "impact_level": "high/medium/low",
+            "affected_sectors": ["受影响领域 1", "领域 2"],
+            "strategic_implication": "对企业的战略启示（30-50 字，可落地）"
+        }}
     ],
-    "opportunities": ["具体市场机会 1", "具体市场机会 2", ...],
-    "recommended_actions": ["高管应采取的行动 1", "高管应采取的行动 2", ...]
+
+    "competitive_landscape": [
+        {{
+            "company": "公司/机构名称",
+            "key_move": "关键动态（20-40 字，精准描述）",
+            "strategic_intent": "战略意图分析（30-50 字，有洞察）",
+            "threat_level": "high/medium/low",
+            "our_response": "我方应对建议（具体可执行）"
+        }}
+    ],
+
+    "risk_alerts": [
+        {{
+            "risk_type": "政策/市场/技术/舆情/供应链/其他",
+            "description": "风险描述（具体、可感知、30-50 字）",
+            "severity": "high/medium/low",
+            "early_signals": "早期预警信号（20-40 字）",
+            "mitigation": "应对建议（具体可落地，30-50 字）"
+        }}
+    ],
+
+    "opportunities": [
+        {{
+            "type": "市场/技术/合作/投资/其他",
+            "description": "机会描述（30-50 字，具体且有依据）",
+            "window": "short_term/medium_term/long_term",
+            "action": "建议采取行动（30-50 字，可执行）"
+        }}
+    ],
+
+    "recommended_actions": [
+        {{
+            "priority": "high/medium/low",
+            "action": "具体行动项（30-50 字，可落地）",
+            "owner": "建议负责部门（如：战略部/市场部/产品部/PR/研发）",
+            "timeline": "建议完成时间（如：1 周内/本月内/Q1）"
+        }}
+    ]
 }}
 
 **撰写要求**：
-1. 用中文输出，语言专业、精准
-2. 核心摘要必须高度凝练，体现情报价值
-3. 趋势洞察要有前瞻性，体现专家视角
-4. 竞争情报要聚焦头部玩家和颠覆性动态
-5. 风险预警要具体可感知，避免空泛
-6. 行动建议要可执行、可落地、有优先级
-7. 基于新闻事实，不要臆测或编造
-8. 如果没有明显风险或机会，对应字段可以是空数组"""
+1. 用简体中文输出，语言专业、精准、有洞察力
+2. 核心摘要必须高度凝练，体现情报价值，避免空话套话
+3. 热点话题要精准提炼，反映真实舆情焦点，不能泛泛而谈
+4. 行业洞察要有前瞻性和深度，体现专家视角
+5. 竞争情报要聚焦头部玩家和颠覆性动态
+6. 风险预警要具体可感知，有早期信号识别
+7. 行动建议要可执行、可落地、有明确优先级和责任人
+8. 基于新闻事实分析，严禁臆测或编造
+9. 如无明显风险/机会/竞争动态，对应字段可为空数组 []
+10. 所有字段必须有实际内容，不能使用"暂无"、"待补充"等占位符"""
 
-        # 调用通义千问 API
-        logger.info(f"[AI 分析] 开始调用 Generation.call，model=qwen-max")
-        response = Generation.call(
-            model='qwen-max',
-            messages=[{'role': 'user', 'content': prompt}],
-            temperature=0.7,
-            max_tokens=2000
-        )
+        # 调用通义千问 API（带超时控制）
+        logger.info(f"[AI 分析] 开始调用 Generation.call，model=qwen-max，timeout=30s")
+        try:
+            response = Generation.call(
+                model='qwen-max',
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.3,  # 降低温度让输出更稳定
+                max_tokens=2000,  # 减少 token 数量加快响应
+                timeout=30  # 30 秒超时（给 AI 足够时间完成深度分析）
+            )
+        except Exception as api_error:
+            logger.error(f"[AI 分析] API 调用超时或异常：{api_error}")
+            return None
 
         logger.info(f"[AI 分析] API 响应状态码：{response.status_code}")
         logger.info(f"[AI 分析] API 响应 code：{response.code}")
@@ -421,7 +497,7 @@ def ai_deep_analysis(news_list):
                 content = response.output.choices[0].message.content
 
             if not content:
-                print(f"AI 分析：无法获取响应内容")
+                logger.error("[AI 分析] 无法获取响应内容")
                 return None
 
             # 尝试解析 JSON
@@ -430,6 +506,13 @@ def ai_deep_analysis(news_list):
                 content = content.replace('```json', '').replace('```', '').strip()
                 analysis_result = json.loads(content)
                 logger.info(f"[AI 分析] JSON 解析成功")
+
+                # 添加元数据
+                analysis_result['source'] = 'qwen-ai'
+                analysis_result['analysis_type'] = 'executive_summary'
+                analysis_result['news_count'] = len(news_list)
+                analysis_result['analyzed_news_count'] = len(精选新闻)
+
                 return analysis_result
             except json.JSONDecodeError as e:
                 logger.error(f"[AI 分析] JSON 解析失败：{e}")
@@ -443,28 +526,38 @@ def ai_deep_analysis(news_list):
         logger.error(f"[AI 分析] 异常：{e}", exc_info=True)
         return None
 
+
+def parse_ai_response(content):
+    """解析 AI 返回的 JSON 响应"""
+    try:
+        # 清理 markdown 标记
+        content = content.replace('```json', '').replace('```', '').strip()
+        result = json.loads(content)
+        logger.info(f"[AI 解析] JSON 解析成功")
+        return result
+    except json.JSONDecodeError as e:
+        logger.error(f"[AI 解析] JSON 解析失败：{e}")
+        logger.error(f"[AI 解析] 响应内容：{content[:500]}...")
+        return None
+
+
 def fallback_analysis(news_list):
-    """备用分析方案（当 API 不可用时）"""
+    """备用分析方案（当 API 不可用时）- 基于本地算法的摘要总结"""
     total = len(news_list)
     if total == 0:
         return None
 
-    # 简单情感统计
-    positive = sum(1 for n in news_list if n.get('sentiment') == 'positive')
-    negative = sum(1 for n in news_list if n.get('sentiment') == 'negative')
-    neutral = total - positive - negative
-
     # 提取关键词（基于词频）
     all_titles = ' '.join([n['title'] for n in news_list])
     # 简单分词（按标点和空格）
-    words = re.findall(r'[\u4e00-\u9fff]+|[A-Za-z]+', all_titles)
+    words = re.findall(r'[\u4e00-\u9fff]{2,4}|[A-Za-z]{2,}', all_titles)
     # 过滤常见停用词
     stopwords = ['的', '了', '是', '在', '和', '与', '等', '个', '这', '那', '就', '都', '而', '及', '着', '了', '一个']
     filtered_words = [w for w in words if w.lower() not in stopwords and len(w) > 1]
 
     from collections import Counter
     word_freq = Counter(filtered_words)
-    top_keywords = word_freq.most_common(5)
+    top_keywords = word_freq.most_common(8)
 
     # 行业分类（基于关键词匹配）
     industry_keywords = {
@@ -488,18 +581,60 @@ def fallback_analysis(news_list):
     # 计算平均热度（处理 hot_score 为 None 的情况）
     avg_hot_score = sum((n.get('hot_score') or 50) for n in news_list) / total
 
+    # 生成执行摘要
+    executive_summary = f"本次共分析 {total} 条热点新闻，平均热度 {avg_hot_score:.1f} 分。"
+    if top_industries:
+        executive_summary += f" 主要关注领域：{top_industries[0][0]}（{top_industries[0][1]}条）"
+
+    # 构建关键词列表作为关键事件
+    key_highlights = [f"{kw[0]}相关：{kw[1]}条" for kw in top_keywords[:5]]
+
     return {
-        "executive_summary": f"本次共分析 {total} 条新闻，平均热度 {avg_hot_score:.1f} 分。正面舆情 {positive/total*100:.1f}%，负面舆情 {negative/total*100:.1f}%。",
-        "sentiment_analysis": {
-            "overall": "positive" if positive > negative else "negative" if negative > positive else "neutral",
-            "positive_rate": round(positive / total, 2),
-            "key_drivers": []
-        },
-        "trend_insights": [{"trend": kw[0], "confidence": "medium", "evidence": f"提及{kw[1]}次", "impact": "持续关注"} for kw in top_keywords[:3]],
-        "competitive_intelligence": [],
-        "risk_warnings": [],
-        "opportunities": [f"{ind[0]}领域活跃（{ind[1]}条新闻）" for ind in top_industries],
-        "recommended_actions": ["持续关注重点行业动态", "建立负面舆情预警机制"]
+        "executive_summary": executive_summary,
+        "key_highlights": key_highlights,
+        "trending_topics": [
+            {
+                "topic": kw[0],
+                "description": f"提及{kw[1]}次",
+                "heat_level": "high" if kw[1] > 5 else "medium",
+                "related_news_count": kw[1]
+            }
+            for kw in top_keywords[:5]
+        ],
+        "industry_insights": [
+            {
+                "trend": f"{ind[0]}领域活跃",
+                "impact_level": "high" if ind[1] > 5 else "medium",
+                "affected_sectors": [ind[0]],
+                "strategic_implication": f"建议持续关注{ind[0]}领域发展动态"
+            }
+            for ind in top_industries
+        ],
+        "competitive_landscape": [],
+        "risk_alerts": [],
+        "opportunities": [
+            {
+                "type": "市场",
+                "description": f"{ind[0]}领域活跃（{ind[1]}条新闻）",
+                "window": "short_term",
+                "action": f"关注{ind[0]}领域投资机会"
+            }
+            for ind in top_industries
+        ],
+        "recommended_actions": [
+            {
+                "priority": "high",
+                "action": "持续关注重点行业动态",
+                "owner": "战略部",
+                "timeline": "持续进行"
+            },
+            {
+                "priority": "medium",
+                "action": "建立负面舆情预警机制",
+                "owner": "PR 部门",
+                "timeline": "1 周内"
+            }
+        ]
     }
 
 def analyze_sentiment(title):
@@ -796,13 +931,20 @@ def fetch_all_news():
 
 @app.route('/')
 def index():
-    return render_template('index-elegant.html')
+    """首页 - 添加禁止缓存头"""
+    response = render_template('index-elegant.html')
+    response = app.make_response(response)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/news')
 def get_news_route():
     """获取最新新闻（从数据库）"""
-    news = get_news(limit=300)
-    return jsonify(news)
+    limit = request.args.get('limit', 50, type=int)
+    news = get_news(limit=limit)
+    return jsonify({'news': news, 'count': len(news)})
 
 @app.route('/api/news/by-channel')
 def get_news_by_channel_route():
@@ -974,9 +1116,8 @@ def search_news():
         if source == 'browser':
             # 使用浏览器搜索获取热榜
             try:
-                from browser_search import sync_search, get_proxy_from_env
-                proxy = PROXY_SERVER or get_proxy_from_env()
-                news = sync_search(keyword='', proxy=proxy)
+                from browser_search import sync_search
+                news = sync_search(keyword='')
                 logger.info(f"浏览器热榜搜索完成，获取 {len(news)} 条结果")
                 return jsonify(news)
             except Exception as e:
@@ -994,9 +1135,8 @@ def search_news():
     if source in ('browser', 'all'):
         # 使用浏览器实时搜索
         try:
-            from browser_search import sync_search, get_proxy_from_env
-            proxy = PROXY_SERVER or get_proxy_from_env()
-            browser_results = sync_search(keyword=query, proxy=proxy)
+            from browser_search import sync_search
+            browser_results = sync_search(keyword=query)
             logger.info(f"浏览器关键词搜索完成，获取 {len(browser_results)} 条结果")
         except Exception as e:
             logger.error(f"浏览器搜索失败：{e}")
@@ -1057,35 +1197,98 @@ def get_stats():
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_news():
-    """AI 深度分析接口"""
-    global ai_analysis_cache
+    """AI 深度分析接口 - 基于浏览器搜索的实时热点数据 + 通义千问大模型摘要总结"""
+    global cached_news
 
-    data = request.get_json()
+    data = request.get_json() or {}
     news_list = data.get('news', [])
+    keyword = data.get('keyword', '')  # 可选的定向关键词
+
+    # 策略：不使用缓存，每次用户主动刷新都重新分析，确保数据新鲜度
+    # 优化：有传入新闻数据时，跳过浏览器搜索，直接分析
+    use_browser = BROWSER_SEARCH_ENABLED and not news_list and not keyword
+
+    # 不再使用缓存，每次都重新分析
+    # 注意：移除了 ai_analysis_cache 的缓存判断逻辑
+
+    if use_browser:
+        logger.info("[AI 分析] 使用浏览器搜索获取实时热点数据（优化：8s 超时）...")
+        try:
+            from browser_search import sync_search
+
+            # 优化：缩短超时到 8 秒，加快失败降级
+            search_keyword = keyword if keyword else ''
+            news_list = sync_search(keyword=search_keyword, timeout=8)
+            logger.info(f"[AI 分析] 浏览器搜索获取到 {len(news_list)} 条热点数据")
+
+            # 如果浏览器搜索返回空结果或超时，降级到数据库
+            if not news_list:
+                logger.warning("[AI 分析] 浏览器搜索返回空结果，降级到数据库数据")
+                news_list = get_news(limit=100)
+
+        except Exception as e:
+            logger.error(f"[AI 分析] 浏览器搜索失败：{e}，降级到数据库数据")
+            # 降级到数据库获取最新新闻
+            news_list = get_news(limit=100)
+    elif not news_list:
+        # 没有使用浏览器搜索且没有传入数据，从缓存或数据库获取
+        news_list = cached_news if cached_news else get_news(limit=100)
 
     if not news_list:
-        return jsonify({'error': '暂无数据可分析'}), 400
+        return jsonify({'error': '暂无数据可分析，请稍后重试'}), 400
+
+    # 精选代表性新闻（最多 50 条）
+    sorted_news = sorted(news_list, key=lambda x: x.get('hot_score') or 50, reverse=True)
+    selected_news = sorted_news[:50]
+
+    logger.info(f"[AI 分析] 开始分析 {len(selected_news)} 条新闻")
 
     # 尝试使用 AI 深度分析
-    ai_result = ai_deep_analysis(news_list)
+    ai_result = ai_deep_analysis(selected_news)
 
     if ai_result:
         # AI 分析成功，格式化输出
-        analysis_html = format_ai_analysis_html(ai_result, len(news_list))
+        analysis_html = format_ai_analysis_html(ai_result, len(selected_news))
+
+        # 保存分析结果到数据库（用于历史记录查询）
+        save_ai_analysis(ai_result, selected_news, analysis_type='ai_deep')
+
+        # 不再更新缓存，确保每次用户刷新都重新分析
+        # ai_analysis_cache 已废弃
+
         return jsonify({
             'summary': analysis_html,
             'analysis_type': 'ai_deep',
+            'source': 'browser' if use_browser and news_list else 'database',
+            'news_count': len(selected_news),
             'raw_data': ai_result
         })
     else:
         # AI 分析失败，使用备用方案
-        fallback_result = fallback_analysis(news_list)
-        analysis_html = format_fallback_analysis_html(fallback_result, len(news_list))
+        logger.warning("[AI 分析] AI 分析失败，使用备用方案")
+        fallback_result = fallback_analysis(selected_news)
+        analysis_html = format_fallback_analysis_html(fallback_result, len(selected_news))
         return jsonify({
             'summary': analysis_html,
             'analysis_type': 'fallback',
+            'source': 'local',
+            'news_count': len(selected_news),
             'raw_data': fallback_result
         })
+
+
+@app.route('/api/analyze/history', methods=['GET'])
+def get_analysis_history():
+    """获取历史 AI 分析记录"""
+    limit = request.args.get('limit', 10, type=int)
+    analysis_type = request.args.get('type', None)
+
+    history = get_ai_analysis(limit=limit, analysis_type=analysis_type)
+
+    return jsonify({
+        'history': history,
+        'count': len(history)
+    })
 
 
 @app.route('/api/analyze/keywords', methods=['POST'])
@@ -1121,15 +1324,63 @@ def analyze_keywords():
     })
 
 
+@app.route('/api/analyze/sentiment', methods=['POST'])
+def analyze_sentiment_batch():
+    """情感分析接口 - 批量分析新闻情感"""
+    start_time = time.time()
+
+    data = request.get_json()
+    news_list = data.get('news', [])
+
+    if not news_list:
+        return jsonify({
+            'sentiment_distribution': {'positive': 0, 'neutral': 0, 'negative': 0},
+            'sentiment_rate': {'positive': 0, 'neutral': 0, 'negative': 0},
+            'total': 0
+        })
+
+    # 统计情感分布
+    sentiment_count = {'positive': 0, 'neutral': 0, 'negative': 0}
+    sentiment_details = []
+
+    for news in news_list:
+        title = news.get('title', '')
+        sentiment = analyze_sentiment_simple(title)
+        sentiment_count[sentiment] += 1
+        sentiment_details.append({
+            'title': title[:50],
+            'sentiment': sentiment
+        })
+
+    total = len(news_list)
+    positive_rate = round(sentiment_count['positive'] / total, 2) if total > 0 else 0
+    neutral_rate = round(sentiment_count['neutral'] / total, 2) if total > 0 else 0
+    negative_rate = round(sentiment_count['negative'] / total, 2) if total > 0 else 0
+
+    elapsed = time.time() - start_time
+    logger.info(f"情感分析完成，耗时 {elapsed:.3f}s，分析 {total} 条新闻")
+
+    return jsonify({
+        'sentiment_distribution': sentiment_count,
+        'sentiment_rate': {
+            'positive': positive_rate,
+            'neutral': neutral_rate,
+            'negative': negative_rate
+        },
+        'total': total,
+        'sentiment_details': sentiment_details[:20]  # 只返回前 20 条详情
+    })
+
+
 @app.route('/api/recommend', methods=['POST'])
 def recommend_news():
-    """AI 推荐接口 - 混合推荐系统（外部 API + 本地算法）"""
+    """AI 推荐接口 - 优先使用本地数据库数据，外部 API 作为补充"""
     start_time = time.time()
 
     data = request.get_json()
     news_list = data.get('news', [])
     history = data.get('history', [])
-    use_external_api = data.get('use_external_api', True)
+    use_external_api = data.get('use_external_api', False)  # 默认不使用外部 API
 
     # 从请求头或数据中获取用户 ID
     user_id = request.headers.get('X-User-ID', data.get('user_id', 'default'))
@@ -1138,188 +1389,430 @@ def recommend_news():
     user_interests_data = get_user_interests(user_id)
     user_keywords = [item['keyword'] for item in user_interests_data[:5]]
 
-    # 优先使用外部推荐 API
-    external_recommendations = []
-    use_external = use_external_api
+    logger.info(f'[推荐系统] 开始生成推荐，用户兴趣：{user_keywords}, 本地新闻数：{len(news_list)}')
 
-    if use_external:
+    # 优先使用本地推荐算法（基于数据库中的新闻数据），默认显示 20 条
+    local_recommendations = []
+    if news_list:
         try:
-            logger.info('[推荐系统] 开始调用外部推荐 API...')
-            from recommendation_engine import sync_generate_recommendations, get_proxy_from_env
-            proxy = get_proxy_from_env()
+            user_vector = build_user_vector(history, user_interests_data, recent_weight=1.5)
+
+            if not user_vector and history:
+                all_history_titles = ' '.join([h.get('title', '') for h in history])
+                user_vector = {kw: 1.0 for kw in extract_keywords_enhanced([all_history_titles], top_n=10)}
+
+            scored_news = []
+            for news in news_list:
+                title = news.get('title', '')
+                hot_score = news.get('hot_score') or 50
+                news_keywords = extract_keywords_enhanced([title], top_n=5)
+                interest_score = 0.0
+                matched_keywords = []
+                for kw in news_keywords:
+                    if kw in user_vector:
+                        interest_score += user_vector[kw]
+                        matched_keywords.append(kw)
+                hot_normalized = (hot_score - 50) / 50 if hot_score > 50 else 0
+                combined_score = (interest_score * 0.7) + (hot_normalized * 0.3)
+                scored_news.append({'news': news, 'score': combined_score, 'interest_score': interest_score, 'matched_keywords': matched_keywords})
+
+            scored_news.sort(key=lambda x: x['score'], reverse=True)
+
+            # 默认返回 20 条本地推荐
+            for item in scored_news[:20]:
+                news = item['news']
+                link = news.get('link', '#')
+                news_id = hashlib.md5(link.encode()).hexdigest()[:16] if link != '#' else 'unknown'
+                reason = '热门内容'
+                if item['interest_score'] > 0 and item['matched_keywords']:
+                    reason = f"匹配兴趣：{', '.join(item['matched_keywords'][:3])}"
+                local_recommendations.append({
+                    'news_id': news_id,
+                    'title': news.get('title', ''),
+                    'link': link,
+                    'score': f'{item["score"]:.2f}',
+                    'reason': reason,
+                    'matched_keywords': item['matched_keywords'],
+                    'recommendation_type': 'hybrid' if item['interest_score'] > 0 else 'trending',
+                    'source_name': news.get('source', '未知'),
+                    'time_ago': news.get('time_ago', '刚刚'),
+                    'semantic_tags': news.get('semantic_tags', []),
+                })
+
+            logger.info(f'[推荐系统] 本地推荐生成 {len(local_recommendations)} 条推荐')
+        except Exception as e:
+            logger.error(f'[推荐系统] 本地推荐失败：{e}')
+    else:
+        logger.warning('[推荐系统] 本地新闻数据为空')
+
+    # 如果本地推荐不足 20 条，从数据库补充更多数据
+    if len(local_recommendations) < 20:
+        try:
+            # 从数据库获取最新新闻补充
+            db_news = get_news(limit=50)
+            if db_news and len(db_news) > len(news_list):
+                # 补充数据库中独有的新闻
+                existing_links = set(n.get('link') for n in news_list)
+                additional_news = [n for n in db_news if n.get('link') not in existing_links]
+
+                # 对补充的新闻重新计算分数
+                for news in additional_news[:20 - len(local_recommendations)]:
+                    title = news.get('title', '')
+                    hot_score = news.get('hot_score') or 50
+                    news_keywords = extract_keywords_enhanced([title], top_n=5)
+                    interest_score = 0.0
+                    matched_keywords = []
+                    for kw in news_keywords:
+                        if kw in user_vector:
+                            interest_score += user_vector[kw]
+                            matched_keywords.append(kw)
+                    hot_normalized = (hot_score - 50) / 50 if hot_score > 50 else 0
+                    combined_score = (interest_score * 0.7) + (hot_normalized * 0.3)
+
+                    link = news.get('link', '#')
+                    news_id = hashlib.md5(link.encode()).hexdigest()[:16] if link != '#' else 'unknown'
+                    reason = '热门内容'
+                    if interest_score > 0 and matched_keywords:
+                        reason = f"匹配兴趣：{', '.join(matched_keywords[:3])}"
+
+                    local_recommendations.append({
+                        'news_id': news_id,
+                        'title': title,
+                        'link': link,
+                        'score': f'{combined_score:.2f}',
+                        'reason': reason,
+                        'matched_keywords': matched_keywords,
+                        'recommendation_type': 'hybrid' if interest_score > 0 else 'trending',
+                        'source_name': news.get('source', '未知'),
+                        'time_ago': news.get('time_ago', '刚刚'),
+                        'semantic_tags': news.get('semantic_tags', []),
+                    })
+
+            logger.info(f'[推荐系统] 从数据库补充后共有 {len(local_recommendations)} 条推荐')
+        except Exception as e:
+            logger.error(f'[推荐系统] 从数据库补充失败：{e}')
+
+    # 如果本地推荐不足 20 条且用户有关键词，使用外部 API 补充
+    external_recommendations = []
+    if len(local_recommendations) < 20 and user_keywords:
+        try:
+            logger.info(f'[推荐系统] 开始调用外部推荐 API 补充（已有{len(local_recommendations)}条）...')
+            from recommendation_engine import sync_generate_recommendations
 
             external_recommendations = sync_generate_recommendations(
                 news_list=news_list,
                 user_keywords=user_keywords,
                 history=history,
-                limit=10,
-                proxy=proxy
+                limit=20 - len(local_recommendations)
             )
             logger.info(f'[推荐系统] 获取到 {len(external_recommendations)} 条外部推荐')
         except Exception as e:
-            logger.error(f'[推荐系统] 外部 API 调用失败：{e}，降级到本地推荐')
-            use_external = False
+            logger.error(f'[推荐系统] 外部 API 调用失败：{e}')
 
-    # 如果外部 API 失败，使用本地推荐算法
-    if not use_external:
-        if not news_list:
-            return jsonify({'recommendations': [], 'source': 'local'})
-
-        user_vector = build_user_vector(history, user_interests_data, recent_weight=1.5)
-
-        if not user_vector and history:
-            all_history_titles = ' '.join([h.get('title', '') for h in history])
-            user_vector = {kw: 1.0 for kw in extract_keywords_enhanced([all_history_titles], top_n=10)}
-
-        scored_news = []
-        for news in news_list:
-            title = news.get('title', '')
-            hot_score = news.get('hot_score') or 50
-            news_keywords = extract_keywords_enhanced([title], top_n=5)
-            interest_score = 0.0
-            matched_keywords = []
-            for kw in news_keywords:
-                if kw in user_vector:
-                    interest_score += user_vector[kw]
-                    matched_keywords.append(kw)
-            hot_normalized = (hot_score - 50) / 50 if hot_score > 50 else 0
-            combined_score = (interest_score * 0.7) + (hot_normalized * 0.3)
-            scored_news.append({'news': news, 'score': combined_score, 'interest_score': interest_score, 'matched_keywords': matched_keywords})
-
-        scored_news.sort(key=lambda x: x['score'], reverse=True)
-
-        recommendations = []
-        for item in scored_news[:5]:
-            news = item['news']
-            link = news.get('link', '#')
-            # 使用 link 的哈希值作为唯一 news_id
-            news_id = hashlib.md5(link.encode()).hexdigest()[:16] if link != '#' else 'unknown'
-            reason = '热门内容'
-            if item['interest_score'] > 0 and item['matched_keywords']:
-                reason = f"匹配兴趣：{', '.join(item['matched_keywords'][:3])}"
-            recommendations.append({
-                'news_id': news_id,
-                'title': news.get('title', ''),
-                'link': link,
-                'score': f'{item["score"]:.2f}',
-                'reason': reason,
-                'matched_keywords': item['matched_keywords'],
-                'recommendation_type': 'local'
-            })
-
+    # 合并推荐结果（本地优先，外部补充）
+    if local_recommendations:
+        recommendations = local_recommendations[:20]  # 返回 20 条
         elapsed = time.time() - start_time
-        logger.info(f"推荐计算完成（本地模式），耗时 {elapsed:.3f}s")
-        return jsonify({'recommendations': recommendations, 'source': 'local'})
-
-    # 使用外部推荐结果
-    recommendations = []
-    for rec in external_recommendations[:10]:
-        link = rec.get('link', '#')
-        # 使用 link 的哈希值作为唯一 news_id
-        news_id = hashlib.md5(link.encode()).hexdigest()[:16] if link != '#' else 'unknown'
-        recommendations.append({
-            'news_id': news_id,
-            'title': rec.get('title', ''),
-            'link': link,
-            'score': f'{rec.get("score", 0):.2f}',
-            'reason': rec.get('reason', '为您推荐'),
-            'recommendation_type': rec.get('recommendation_type', 'hybrid'),
-            'source_name': rec.get('source', '')
+        logger.info(f"推荐计算完成（本地优先），耗时 {elapsed:.3f}s，生成 {len(recommendations)} 条推荐")
+        return jsonify({
+            'recommendations': recommendations,
+            'source': 'local_priority',
+            'recommendation_types': {
+                'trending': '实时热点',
+                'hybrid': '兴趣 + 热点',
+                'collaborative': '兴趣匹配'
+            }
         })
 
+    # 本地推荐为空时使用外部 API 结果
+    if external_recommendations:
+        recommendations = []
+        for rec in external_recommendations[:10]:
+            link = rec.get('link', '#')
+            news_id = hashlib.md5(link.encode()).hexdigest()[:16] if link != '#' else 'unknown'
+            recommendations.append({
+                'news_id': news_id,
+                'title': rec.get('title', ''),
+                'link': link,
+                'score': f'{rec.get("score", 0):.2f}',
+                'reason': rec.get('reason', '为您推荐'),
+                'recommendation_type': rec.get('recommendation_type', 'hybrid'),
+                'source_name': rec.get('source', ''),
+                'time_ago': '刚刚'
+            })
+        elapsed = time.time() - start_time
+        logger.info(f"推荐计算完成（外部 API），耗时 {elapsed:.3f}s，生成 {len(recommendations)} 条推荐")
+        return jsonify({'recommendations': recommendations, 'source': 'external_api'})
+
+    # 都没有时返回空
     elapsed = time.time() - start_time
-    logger.info(f"推荐计算完成（外部 API 模式），耗时 {elapsed:.3f}s，生成 {len(recommendations)} 条推荐")
-    return jsonify({'recommendations': recommendations, 'source': 'external_api', 'recommendation_types': {'trending': '实时热点', 'collaborative': '兴趣匹配', 'similar_content': '相关内容'}})
+    logger.warning(f"推荐计算完成，无可用推荐，耗时 {elapsed:.3f}s")
+    return jsonify({'recommendations': [], 'source': 'none'})
 
 
 @app.route('/api/analyze/social', methods=['POST'])
 def analyze_social():
-    """社交分析接口 - 调用外部社交平台 API 获取实时数据"""
+    """社交分析接口 - 使用通义千问大模型进行深度社交舆情分析"""
     start_time = time.time()
 
     data = request.get_json()
     news_list = data.get('news', [])
-    use_external_api = data.get('use_external_api', True)  # 默认使用外部 API
 
-    # 优先从外部社交平台获取真实数据
-    social_data = []
-    if use_external_api:
-        try:
-            logger.info('[社交分析] 开始调用外部社交 API...')
-            from social_data_fetcher import sync_fetch_all_social, get_proxy_from_env
-            proxy = get_proxy_from_env()
-            social_data = sync_fetch_all_social(proxy)
-            logger.info(f'[社交分析] 获取到 {len(social_data)} 条社交数据')
-        except Exception as e:
-            logger.error(f'[社交分析] 外部 API 调用失败：{e}，降级到本地分析')
-            use_external_api = False
+    if not news_list:
+        return jsonify({'metrics': {}, 'trends': [], 'ai_insights': None})
 
-    # 如果外部 API 失败，使用本地新闻数据进行估算
-    if not use_external_api and not social_data:
-        if not news_list:
-            return jsonify({'metrics': {}, 'trends': []})
+    # 尝试使用通义千问 AI 分析
+    ai_result = analyze_social_with_qwen(news_list)
 
-        total_count = len(news_list)
-
-        # 本地估算逻辑
-        total_engagement = 0
-        viral_count = 0
-        sentiment_sum = 0
-        hot_topics = []
-        sentiment_distribution = {'positive': 0, 'neutral': 0, 'negative': 0}
-
-        for news in news_list:
-            hot_score = news.get('hot_score') or 50
-            title = news.get('title', '')
-            sentiment = analyze_sentiment_simple(title)
-
-            engagement = int(hot_score * 2.5)
-            total_engagement += engagement
-
-            if hot_score > 75:
-                viral_count += 1
-                hot_topics.append({
-                    'topic': news.get('title', '')[:30],
-                    'engagement': engagement,
-                    'hot_score': hot_score,
-                    'sentiment': sentiment
-                })
-
-            sentiment_scores = {'positive': 1, 'neutral': 0.5, 'negative': 0}
-            sentiment_sum += sentiment_scores.get(sentiment, 0.5)
-            sentiment_distribution[sentiment] += 1
-
-        avg_sentiment = sentiment_sum / total_count if total_count > 0 else 0.5
-        avg_hot_score = sum(n.get('hot_score') or 50 for n in news_list) / total_count if total_count > 0 else 50
-        trend_velocity = (viral_count * 3.5) + (avg_hot_score / 10)
-
-        titles = [n.get('title', '') for n in news_list]
-        trend_keywords = extract_keywords_enhanced(titles, top_n=10)
-
-        trends = [
-            {'topic': kw, 'engagement': (idx + 1) * 100, 'hot_score': (10 - idx) * 5}
-            for idx, kw in enumerate(trend_keywords[:5])
-        ]
-
-        hot_topics.sort(key=lambda x: x['hot_score'], reverse=True)
-        top_viral = hot_topics[:3]
-
+    if ai_result:
         elapsed = time.time() - start_time
-        logger.info(f"社交分析完成（本地模式），耗时 {elapsed:.3f}s")
+        logger.info(f"社交分析完成（AI 模式），耗时 {elapsed:.3f}s")
+        return jsonify(ai_result)
 
-        return jsonify({
-            'metrics': {
-                'total_engagement': total_engagement,
-                'viral_count': viral_count,
-                'sentiment_score': f'{avg_sentiment:.2f}',
-                'trend_velocity': f'{trend_velocity:.1f}',
-                'avg_hot_score': f'{avg_hot_score:.1f}',
-                'sentiment_distribution': sentiment_distribution,
-                'source': 'local'
-            },
-            'trends': trends,
-            'viral_topics': top_viral
-        })
+    # AI 分析失败时的降级方案：本地估算
+    logger.warning("[社交分析] AI 分析失败，降级到本地估算模式")
+    return fallback_local_social_analysis(news_list)
+
+
+def analyze_social_with_qwen(news_list):
+    """使用通义千问进行社交舆情分析"""
+    if not DASHSCOPE_API_KEY:
+        return None
+
+    try:
+        import dashscope
+        from dashscope import Generation
+
+        dashscope.api_key = DASHSCOPE_API_KEY
+
+        # 精选代表性新闻（最多 30 条，覆盖高热度和不同来源）
+        sorted_news = sorted(news_list, key=lambda x: x.get('hot_score') or 50, reverse=True)
+        selected_news = sorted_news[:30]
+
+        # 构建新闻摘要
+        news_summary = "\n".join([
+            f"- [{n.get('source', '未知')}] {n.get('title', '')} | 热度：{n.get('hot_score') or 50}"
+            for n in selected_news
+        ])
+
+        # 构建专业提示词（高管 + 行研双重视角）
+        prompt = f"""你是一位资深舆情分析专家，兼具企业高管战略视角和证券行业研究员的专业洞察力。
+请基于以下最新热点新闻进行深度社交舆情分析：
+
+{news_summary}
+
+**报告定位**：
+- 受众：企业 CEO、高管、战略决策者、行业研究员
+- 风格：专业、精准、有数据支撑、有前瞻洞察
+- 目标：帮助决策者快速把握舆情态势、识别机会与风险
+
+请输出 JSON 格式的舆情分析报告，包含以下字段：
+{{
+    "executive_summary": "150 字以内的核心摘要，高度概括当前舆情态势，让高管 30 秒内掌握全局",
+    "social_metrics": {{
+        "total_engagement_estimate": "预估总互动量（基于热度分估算）",
+        "viral_topic_count": "病毒式传播话题数量",
+        "avg_sentiment_score": "平均情感得分 (0-1，越接近 1 越正面)",
+        "trend_velocity": "趋势热度 (0-100，反映舆情升温速度）",
+        "hot_score_avg": "平均热度分"
+    }},
+    "sentiment_analysis": {{
+        "overall": "positive/neutral/negative",
+        "positive_rate": 0.0-1.0,
+        "neutral_rate": 0.0-1.0,
+        "negative_rate": 0.0-1.0,
+        "key_drivers": ["驱动情感倾向的关键事件或因素 1", "因素 2", ...]
+    }},
+    "trending_topics": [
+        {{
+            "topic": "热点话题名称（精准提炼，5-15 字）",
+            "description": "话题详细描述（30-50 字，说明背景和进展）",
+            "engagement_level": "high/medium/low",
+            "hot_score": 热度分 (0-100),
+            "sentiment": "positive/neutral/negative",
+            "related_news_count": 相关新闻数量
+        }}
+    ],
+    "industry_insights": [
+        {{
+            "trend": "行业趋势或动态",
+            "impact_level": "high/medium/low",
+            "affected_segments": ["受影响的细分领域 1", "细分领域 2"],
+            "time_horizon": "short_term/medium_term/long_term",
+            "strategic_implication": "对我方的战略启示或行动建议"
+        }}
+    ],
+    "competitive_landscape": [
+        {{
+            "company": "公司/机构名称",
+            "recent_move": "近期关键动态",
+            "strategic_intent": "背后的战略意图分析",
+            "threat_level": "high/medium/low",
+            "our_response": "我方应对建议"
+        }}
+    ],
+    "risk_alerts": [
+        {{
+            "risk_type": "政策/市场/技术/舆情/供应链/其他",
+            "description": "风险描述（具体、可感知）",
+            "probability": "high/medium/low",
+            "impact": "high/medium/low",
+            "early_signals": "早期预警信号",
+            "mitigation_actions": "具体应对建议"
+        }}
+    ],
+    "opportunity_signals": [
+        {{
+            "opportunity_type": "市场/技术/合作/投资/其他",
+            "description": "机会描述",
+            "window": "short_term/medium_term/long_term",
+            "action_required": "需要采取的行动"
+        }}
+    ],
+    "recommended_actions": [
+        {{
+            "priority": "high/medium/low",
+            "action": "具体行动项",
+            "owner": "建议负责部门（如：战略部/市场部/产品部/PR）",
+            "timeline": "建议完成时间"
+        }}
+    ]
+}}
+
+**撰写要求**：
+1. 用中文输出，语言专业、精准、有洞察力
+2. 核心摘要必须高度凝练，体现情报价值
+3. 热点话题要精准提炼，反映真实舆情焦点
+4. 行业洞察要有前瞻性和深度，体现专家视角
+5. 竞争情报要聚焦头部玩家和颠覆性动态
+6. 风险预警要具体可感知，有早期信号识别
+7. 行动建议要可执行、可落地、有明确优先级
+8. 基于新闻事实分析，不要臆测或编造
+9. 如无明显风险/机会，对应字段可为空数组"""
+
+        response = Generation.call(
+            model='qwen-max',
+            messages=[{'role': 'user', 'content': prompt}],
+            temperature=0.3,
+            max_tokens=3000
+        )
+
+        if response.status_code == 200 and response.output and response.output.text:
+            ai_content = response.output.text
+            logger.info(f"[社交分析] AI 响应长度：{len(ai_content)}")
+
+            # 解析 JSON
+            result = parse_ai_response(ai_content)
+            if result:
+                # 字段名映射：将 AI 返回的字段名映射为前端期望的字段名
+                social_metrics = result.get('social_metrics', {})
+                metrics = {
+                    'total_engagement': social_metrics.get('total_engagement_estimate', 0),
+                    'viral_count': social_metrics.get('viral_topic_count', 0),
+                    'sentiment_score': social_metrics.get('avg_sentiment_score', 0),
+                    'trend_velocity': social_metrics.get('trend_velocity', 0),
+                    'avg_hot_score': social_metrics.get('hot_score_avg', 0),
+                    'sentiment_distribution': result.get('sentiment_analysis', {}),
+                    'source': 'qwen-ai'
+                }
+
+                # 将 viral_topics 和 trends 映射为前端期望的格式
+                viral_topics = []
+                trending_topics = result.get('trending_topics', [])
+                for topic in trending_topics[:3]:
+                    viral_topics.append({
+                        'topic': topic.get('topic', ''),
+                        'engagement': topic.get('engagement_level', 'medium'),
+                        'hot_score': topic.get('hot_score', 0),
+                        'sentiment': topic.get('sentiment', 'neutral')
+                    })
+
+                trends = []
+                for topic in trending_topics[:5]:
+                    trends.append({
+                        'topic': topic.get('topic', ''),
+                        'engagement': topic.get('hot_score', 0) * 10,
+                        'hot_score': topic.get('hot_score', 0)
+                    })
+
+                # 添加元数据
+                result['metrics'] = metrics
+                result['viral_topics'] = viral_topics
+                result['trends'] = trends
+                result['source'] = 'qwen-ai'
+                result['analysis_type'] = 'social_sentiment_deep'
+                result['news_count'] = len(news_list)
+                result['analyzed_news_count'] = len(selected_news)
+                return result
+
+        logger.warning(f"[社交分析] API 调用失败：status={response.status_code}")
+        return None
+
+    except Exception as e:
+        logger.error(f"[社交分析] 异常：{str(e)}", exc_info=True)
+        return None
+
+
+def fallback_local_social_analysis(news_list):
+    """降级方案：本地估算逻辑"""
+    total_count = len(news_list)
+
+    total_engagement = 0
+    viral_count = 0
+    sentiment_sum = 0
+    hot_topics = []
+    sentiment_distribution = {'positive': 0, 'neutral': 0, 'negative': 0}
+
+    for news in news_list:
+        hot_score = news.get('hot_score') or 50
+        title = news.get('title', '')
+        sentiment = analyze_sentiment_simple(title)
+
+        engagement = int(hot_score * 2.5)
+        total_engagement += engagement
+
+        if hot_score > 75:
+            viral_count += 1
+            hot_topics.append({
+                'topic': news.get('title', '')[:30],
+                'engagement': engagement,
+                'hot_score': hot_score,
+                'sentiment': sentiment
+            })
+
+        sentiment_scores = {'positive': 1, 'neutral': 0.5, 'negative': 0}
+        sentiment_sum += sentiment_scores.get(sentiment, 0.5)
+        sentiment_distribution[sentiment] += 1
+
+    avg_sentiment = sentiment_sum / total_count if total_count > 0 else 0.5
+    avg_hot_score = sum(n.get('hot_score') or 50 for n in news_list) / total_count if total_count > 0 else 50
+    trend_velocity = (viral_count * 3.5) + (avg_hot_score / 10)
+
+    titles = [n.get('title', '') for n in news_list]
+    trend_keywords = extract_keywords_enhanced(titles, top_n=10)
+
+    trends = [
+        {'topic': kw, 'engagement': (idx + 1) * 100, 'hot_score': (10 - idx) * 5}
+        for idx, kw in enumerate(trend_keywords[:5])
+    ]
+
+    hot_topics.sort(key=lambda x: x['hot_score'], reverse=True)
+    top_viral = hot_topics[:3]
+
+    return {
+        'metrics': {
+            'total_engagement': total_engagement,
+            'viral_count': viral_count,
+            'sentiment_score': f'{avg_sentiment:.2f}',
+            'trend_velocity': f'{trend_velocity:.1f}',
+            'avg_hot_score': f'{avg_hot_score:.1f}',
+            'sentiment_distribution': sentiment_distribution,
+            'source': 'local_fallback'
+        },
+        'trends': trends,
+        'viral_topics': top_viral,
+        'ai_insights': None
+    }
 
     # 使用外部社交数据进行分析和整合
     # 统计各平台数据
@@ -1406,7 +1899,7 @@ def analyze_social():
     })
 
 def format_ai_analysis_html(analysis, total_count):
-    """格式化 AI 分析结果为 HTML"""
+    """格式化 AI 分析结果为 HTML - 精简版（移除情感倾向、关键主题、信息密度、风险等级）"""
     html = f"""
     <div class="ai-analysis-report">
         <!-- 核心摘要 -->
@@ -1415,42 +1908,156 @@ def format_ai_analysis_html(analysis, total_count):
             <p class="executive-summary">{analysis.get('executive_summary', '')}</p>
         </div>
 
-        <!-- 情感分析 -->
-        <div class="analysis-section">
-            <h4>📊 情感分析</h4>
-            <div class="sentiment-grid">
-                <div class="sentiment-item">
-                    <span class="sentiment-label">整体舆情</span>
-                    <span class="sentiment-value sentiment-{analysis.get('sentiment_analysis', {}).get('overall', 'neutral')}">
-                        {'正面' if analysis.get('sentiment_analysis', {}).get('overall') == 'positive' else '负面' if analysis.get('sentiment_analysis', {}).get('overall') == 'negative' else '中性'}
-                    </span>
-                </div>
-                <div class="sentiment-item">
-                    <span class="sentiment-label">正面率</span>
-                    <span class="sentiment-value">{analysis.get('sentiment_analysis', {}).get('positive_rate', 0) * 100:.1f}%</span>
-                </div>
-            </div>
-            {format_key_drivers(analysis.get('sentiment_analysis', {}).get('key_drivers', []))}
-        </div>
+        <!-- 热点话题 -->
+        {format_trending_topics(analysis.get('trending_topics', []))}
 
-        <!-- 趋势洞察 -->
-        {format_trend_insights(analysis.get('trend_insights', []))}
+        <!-- 行业洞察 -->
+        {format_industry_insights(analysis.get('industry_insights', []))}
 
-        <!-- 竞争情报 -->
-        {format_competitive_intelligence(analysis.get('competitive_intelligence', []))}
+        <!-- 机会信号 -->
+        {format_opportunities_list(analysis.get('opportunities', []))}
 
-        <!-- 风险预警 -->
-        {format_risk_warnings(analysis.get('risk_warnings', []))}
-
-        <!-- 机会与建议 -->
-        <div class="analysis-section">
-            <h4>💡 机会与建议</h4>
-            {format_opportunities(analysis.get('opportunities', []))}
-            {format_recommended_actions(analysis.get('recommended_actions', []))}
-        </div>
+        <!-- 行动建议 -->
+        {format_recommended_actions_list(analysis.get('recommended_actions', []))}
     </div>
     """
     return html
+
+
+def format_key_highlights(highlights):
+    """格式化关键事件"""
+    if not highlights:
+        return ''
+    items = ''.join([f'<li>{h}</li>' for h in highlights])
+    return f'<div class="analysis-section"><h4>🔥 关键事件</h4><ul class="key-highlights">{items}</ul></div>'
+
+
+def format_trending_topics(topics):
+    """格式化热点话题"""
+    if not topics:
+        return ''
+
+    items = ''
+    for topic in topics:
+        heat_class = topic.get('heat_level', 'medium')
+        items += f"""
+        <div class="topic-item">
+            <div class="topic-header">
+                <span class="topic-name">{topic.get('topic', '')}</span>
+                <span class="heat-badge {heat_class}">{topic.get('heat_level', '')}</span>
+            </div>
+            <p class="topic-description">{topic.get('description', '')}</p>
+            <span class="topic-count">相关新闻：{topic.get('related_news_count', 0)}条</span>
+        </div>
+        """
+    return f'<div class="analysis-section"><h4>🔥 热点话题</h4><div class="topics-container">{items}</div></div>'
+
+
+def format_industry_insights(insights):
+    """格式化行业洞察"""
+    if not insights:
+        return ''
+
+    items = ''
+    for insight in insights:
+        impact_class = insight.get('impact_level', 'medium')
+        items += f"""
+        <div class="insight-item">
+            <div class="insight-header">
+                <span class="insight-trend">{insight.get('trend', '')}</span>
+                <span class="impact-badge {impact_class}">{insight.get('impact_level', '')}</span>
+            </div>
+            <p class="insight-sectors">受影响领域：{', '.join(insight.get('affected_sectors', []))}</p>
+            <p class="insight-implication">{insight.get('strategic_implication', '')}</p>
+        </div>
+        """
+    return f'<div class="analysis-section"><h4>📈 行业洞察</h4><div class="insights-container">{items}</div></div>'
+
+
+def format_competitive_landscape(landscape):
+    """格式化竞争情报"""
+    if not landscape:
+        return ''
+
+    items = ''
+    for intel in landscape:
+        threat_class = intel.get('threat_level', 'medium')
+        items += f"""
+        <div class="competitive-item">
+            <div class="competitive-header">
+                <span class="company-name">{intel.get('company', '')}</span>
+                <span class="threat-badge {threat_class}">{intel.get('threat_level', '')}</span>
+            </div>
+            <p class="competitive-move"><strong>关键动态：</strong>{intel.get('key_move', '')}</p>
+            <p class="competitive-intent"><strong>战略意图：</strong>{intel.get('strategic_intent', '')}</p>
+            <p class="competitive-response"><strong>我方应对：</strong>{intel.get('our_response', '')}</p>
+        </div>
+        """
+    return f'<div class="analysis-section"><h4>🏢 竞争情报</h4><div class="competitive-container">{items}</div></div>'
+
+
+def format_risk_alerts(risks):
+    """格式化风险预警"""
+    if not risks:
+        return ''
+
+    items = ''
+    for risk in risks:
+        severity_class = risk.get('severity', 'medium')
+        items += f"""
+        <div class="risk-item">
+            <div class="risk-header">
+                <span class="risk-type">{risk.get('risk_type', '')}</span>
+                <span class="severity-badge {severity_class}">{risk.get('severity', '')}</span>
+            </div>
+            <p class="risk-description">{risk.get('description', '')}</p>
+            <p class="risk-signals"><strong>早期信号：</strong>{risk.get('early_signals', '')}</p>
+            <p class="risk-mitigation"><strong>应对建议：</strong>{risk.get('mitigation', '')}</p>
+        </div>
+        """
+    return f'<div class="analysis-section"><h4>⚠️ 风险预警</h4><div class="risks-container">{items}</div></div>'
+
+
+def format_opportunities_list(opportunities):
+    """格式化机会信号"""
+    if not opportunities:
+        return ''
+
+    items = ''
+    for opp in opportunities:
+        window_class = opp.get('window', 'medium_term')
+        items += f"""
+        <div class="opportunity-item">
+            <div class="opportunity-header">
+                <span class="opportunity-type">{opp.get('type', '')}</span>
+                <span class="window-badge {window_class}">{opp.get('window', '')}</span>
+            </div>
+            <p class="opportunity-description">{opp.get('description', '')}</p>
+            <p class="opportunity-action"><strong>建议行动：</strong>{opp.get('action', '')}</p>
+        </div>
+        """
+    return f'<div class="analysis-section"><h4>💡 机会信号</h4><div class="opportunities-container">{items}</div></div>'
+
+
+def format_recommended_actions_list(actions):
+    """格式化行动建议"""
+    if not actions:
+        return ''
+
+    items = ''
+    for action in actions:
+        priority_class = action.get('priority', 'medium')
+        items += f"""
+        <div class="action-item">
+            <div class="action-header">
+                <span class="priority-badge {priority_class}">{action.get('priority', '')} 优先级</span>
+                <span class="action-owner">{action.get('owner', '')}</span>
+            </div>
+            <p class="action-text">{action.get('action', '')}</p>
+            <span class="action-timeline">完成时间：{action.get('timeline', '')}</span>
+        </div>
+        """
+    return f'<div class="analysis-section"><h4>✅ 行动建议</h4><div class="actions-container">{items}</div></div>'
 
 def format_key_drivers(drivers):
     if not drivers:
@@ -1543,11 +2150,6 @@ def format_fallback_analysis_html(analysis, total_count):
         <div class="analysis-section">
             <h4>📊 数据概览</h4>
             <p>{analysis.get('executive_summary', '')}</p>
-        </div>
-
-        <div class="analysis-section">
-            <h4>😊 情感分布</h4>
-            <p>正面率：{analysis.get('sentiment_analysis', {}).get('positive_rate', 0) * 100:.1f}%</p>
         </div>
 
         <div class="analysis-section">
@@ -1659,12 +2261,11 @@ if __name__ == '__main__':
     print('📊 舆情监控系统启动')
     print('=' * 60)
     print(f'服务地址：http://localhost:5000')
-    print(f'数据目录：{os.path.dirname(os.path.abspath(__file__))}/data/')
-    print(f'数据库：news_monitor.db')
+    print(f'数据库路径：/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3')
     print(f'爬虫平台：{len(CRAWLER_IMPLEMENTED)} 个')
     print(f'RSS 源：国内 {len(RSS_FEEDS_DOMESTIC)} 个，国外 {len(RSS_FEEDS_OVERSEAS)} 个')
     print('=' * 60)
     print('提示：爬虫数据会通过定时任务每 10 分钟自动更新')
     print('      可通过 POST /api/refresh 手动刷新数据')
     print('=' * 60)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

@@ -7,7 +7,7 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'news_monitor.db')
+DB_PATH = '/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3'
 
 # 爬虫平台列表
 CRAWLER_PLATFORMS = ['36 氪科技', '今日头条', '微博热搜', '百度热搜', '知乎热榜', 'B 站热搜']

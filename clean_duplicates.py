@@ -7,7 +7,7 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'news_monitor.db')
+DB_PATH = '/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3'
 
 
 def clean_duplicate_news():

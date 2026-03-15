@@ -1,0 +1,8 @@
+flask
+flask-cors
+feedparser
+requests
+beautifulsoup4
+neo4j
+dashscope
+python-dotenv
