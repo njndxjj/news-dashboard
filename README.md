@@ -203,7 +203,17 @@ cd backend && flask run --port 5100
 cd ../frontend-new && npm run dev
 ```
 
-详细部署指南请查看 [`Lumos/QUICKSTART.md`](Lumos/QUICKSTART.md)
+### 方式三：阿里云 ECS 部署（CentOS 7.9）
+
+```bash
+# 一键部署（在服务器终端执行）
+ssh root@<你的服务器 IP>
+bash < <(curl -fsSL https://raw.githubusercontent.com/njndxjj/lumos/main/deploy_centos.sh)
+```
+
+详细部署指南请查看：
+- [`Lumos/QUICKSTART.md`](Lumos/QUICKSTART.md) - 本地开发文档
+- [`DEPLOY_CENTOS_MANUAL.md`](DEPLOY_CENTOS_MANUAL.md) - 阿里云部署文档
 
 ---
 

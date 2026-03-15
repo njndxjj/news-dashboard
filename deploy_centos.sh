@@ -1,33 +1,75 @@
 #!/bin/bash
-# 阿里云 ECS (CentOS 7.9) 一键部署脚本
+# 阿里云 ECS 通用一键部署脚本（适配 CentOS/Ubuntu/Debian）
 # 使用方法：bash deploy_centos.sh
 
 set -e
 
 echo "========================================"
 echo "  阿里云 ECS 部署 - Lumos 新闻爬虫"
-echo "  系统：CentOS 7.9 | 4 核 8G"
 echo "========================================"
+
+# 检测操作系统
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    elif [ -f /etc/redhat-release ]; then
+        echo "centos"
+    else
+        echo "unknown"
+    fi
+}
+
+OS=$(detect_os)
+echo "检测到操作系统：$OS"
 
 # 1. 安装 Docker
 echo "[1/7] 正在安装 Docker..."
-yum install -y yum-utils
-yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-yum install -y docker-ce docker-ce-cli containerd.io
-systemctl enable docker
-systemctl start docker
-echo "✓ Docker 安装完成"
+case "$OS" in
+    ubuntu|debian)
+        apt-get update
+        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+        curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | apt-key add -
+        add-apt-repository "deb [arch=amd64] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable"
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io
+        ;;
+    centos|rhel|aliyun)
+        yum install -y yum-utils
+        yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        yum install -y docker-ce docker-ce-cli containerd.io
+        systemctl enable docker
+        systemctl start docker
+        ;;
+    *)
+        # 尝试通用安装方式
+        curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
+        ;;
+esac
+systemctl enable docker 2>/dev/null || true
+systemctl start docker 2>/dev/null || true
+echo "✓ Docker 安装完成 ($(docker --version))"
 
 # 2. 安装 Docker Compose
 echo "[2/7] 正在安装 Docker Compose..."
 curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose 2>/dev/null || true
 echo "✓ Docker Compose 安装完成 ($(docker-compose --version))"
 
 # 3. 安装 Git
 echo "[3/7] 正在安装 Git..."
-yum install -y git
+case "$OS" in
+    ubuntu|debian)
+        apt-get install -y git
+        ;;
+    centos|rhel|aliyun)
+        yum install -y git
+        ;;
+    *)
+        apt-get install -y git 2>/dev/null || yum install -y git 2>/dev/null || true
+        ;;
+esac
 echo "✓ Git 安装完成"
 
 # 4. 创建应用目录
