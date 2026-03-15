@@ -2022,6 +2022,168 @@ def get_behavior_trend_analysis(user_id='default', days=30):
     }
 
 
+def get_global_behavior_stats(start_date=None, end_date=None):
+    """
+    获取全局用户行为统计（管理员视角，所有用户）
+    :param start_date: 开始日期 YYYY-MM-DD
+    :param end_date: 结束日期 YYYY-MM-DD
+    :return: 统计数据字典
+    """
+    from datetime import datetime, timedelta
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 默认最近 7 天
+    if not start_date:
+        start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    if not end_date:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+    # 转换日期格式为 datetime
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+
+    # 总活跃用户数
+    cursor.execute('''
+        SELECT COUNT(DISTINCT user_id) as total_users
+        FROM user_behavior_log
+        WHERE DATE(created_at) BETWEEN ? AND ?
+    ''', (start_date, end_date))
+    result = cursor.fetchone()
+    total_users = result['total_users'] if result else 0
+
+    # 总行为事件数
+    cursor.execute('''
+        SELECT COUNT(*) as total_events
+        FROM user_behavior_log
+        WHERE DATE(created_at) BETWEEN ? AND ?
+    ''', (start_date, end_date))
+    result = cursor.fetchone()
+    total_events = result['total_events'] if result else 0
+
+    # 行为类型分布
+    cursor.execute('''
+        SELECT action_type, COUNT(*) as count
+        FROM user_behavior_log
+        WHERE DATE(created_at) BETWEEN ? AND ?
+        GROUP BY action_type
+    ''', (start_date, end_date))
+    event_type_distribution = {row['action_type']: row['count'] for row in cursor.fetchall()}
+
+    # 总点击次数
+    total_clicks = event_type_distribution.get('click', 0)
+
+    # 总搜索次数
+    total_searches = event_type_distribution.get('search', 0)
+
+    # 热门内容 TOP 10
+    cursor.execute('''
+        SELECT news_id, title, source,
+               SUM(CASE WHEN action_type = 'page_view' THEN 1 ELSE 0 END) as view_count,
+               SUM(CASE WHEN action_type = 'click' THEN 1 ELSE 0 END) as click_count,
+               SUM(CASE WHEN action_type = 'like' THEN 1 ELSE 0 END) as like_count,
+               SUM(CASE WHEN action_type = 'collect' THEN 1 ELSE 0 END) as collect_count,
+               SUM(CASE WHEN action_type = 'share' THEN 1 ELSE 0 END) as share_count
+        FROM user_behavior_log
+        WHERE DATE(created_at) BETWEEN ? AND ? AND news_id IS NOT NULL AND title IS NOT NULL
+        GROUP BY news_id, title, source
+        ORDER BY view_count DESC
+        LIMIT 10
+    ''', (start_date, end_date))
+
+    top_content = []
+    for row in cursor.fetchall():
+        top_content.append({
+            'news_id': row['news_id'],
+            'title': row['title'],
+            'source': row['source'],
+            'view_count': row['view_count'],
+            'click_count': row['click_count'],
+            'like_count': row['like_count'],
+            'collect_count': row['collect_count'],
+            'share_count': row['share_count']
+        })
+
+    # 每日活跃用户趋势
+    cursor.execute('''
+        SELECT DATE(created_at) as date, COUNT(DISTINCT user_id) as users
+        FROM user_behavior_log
+        WHERE DATE(created_at) BETWEEN ? AND ?
+        GROUP BY DATE(created_at)
+        ORDER BY date
+    ''', (start_date, end_date))
+    daily_active_users = [{'date': row['date'], 'users': row['users']} for row in cursor.fetchall()]
+
+    conn.close()
+
+    return {
+        'total_users': total_users,
+        'total_events': total_events,
+        'total_clicks': total_clicks,
+        'total_searches': total_searches,
+        'event_type_distribution': event_type_distribution,
+        'top_content': top_content,
+        'daily_active_users': daily_active_users
+    }
+
+
+def get_behavior_events(start_date=None, end_date=None, event_type=None, limit=100):
+    """
+    获取用户行为事件列表（管理员视角）
+    :param start_date: 开始日期 YYYY-MM-DD
+    :param end_date: 结束日期 YYYY-MM-DD
+    :param event_type: 行为类型过滤
+    :param limit: 返回数量限制
+    :return: 事件列表
+    """
+    from datetime import datetime, timedelta
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 默认最近 7 天
+    if not start_date:
+        start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    if not end_date:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+    # 构建查询
+    query = '''
+        SELECT id, user_id, action_type, news_id, title, source,
+               extra_data, stay_duration, created_at
+        FROM user_behavior_log
+        WHERE DATE(created_at) BETWEEN ? AND ?
+    '''
+    params = [start_date, end_date]
+
+    if event_type:
+        query += ' AND action_type = ?'
+        params.append(event_type)
+
+    query += ' ORDER BY created_at DESC LIMIT ?'
+    params.append(limit)
+
+    cursor.execute(query, params)
+
+    events = []
+    for row in cursor.fetchall():
+        events.append({
+            'id': row['id'],
+            'user_id': row['user_id'],
+            'action_type': row['action_type'],
+            'news_id': row['news_id'],
+            'title': row['title'],
+            'source': row['source'],
+            'metadata': row['extra_data'],
+            'stay_duration': row['stay_duration'],
+            'timestamp': row['created_at']
+        })
+
+    conn.close()
+    return events
+
+
 def get_personalized_news(user_id='default', channel_limit=15):
     """
     根据用户兴趣获取个性化新闻

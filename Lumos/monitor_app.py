@@ -987,6 +987,12 @@ def index():
     return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'index.html')
 
 
+@app.route('/admin')
+def admin_page():
+    """管理员后台页面"""
+    return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'admin.html')
+
+
 @app.route('/<path:path>')
 def serve_static(path):
     """提供前端静态资源（JS、CSS 等）"""
@@ -1394,6 +1400,32 @@ def api_get_user_behavior_trend():
     trend = get_behavior_trend_analysis(user_id=user_id, days=days)
 
     return jsonify(trend)
+
+
+@app.route('/api/user/behavior/stats/global', methods=['GET'])
+def api_get_global_behavior_stats():
+    """获取全局用户行为统计（管理员视角）"""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    from database import get_global_behavior_stats
+    stats = get_global_behavior_stats(start_date=start_date, end_date=end_date)
+
+    return jsonify(stats)
+
+
+@app.route('/api/user/behavior/events', methods=['GET'])
+def api_get_behavior_events():
+    """获取用户行为事件列表（管理员视角）"""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    event_type = request.args.get('event_type')
+    limit = request.args.get('limit', 100, type=int)
+
+    from database import get_behavior_events
+    events = get_behavior_events(start_date=start_date, end_date=end_date, event_type=event_type, limit=limit)
+
+    return jsonify(events)
 
 
 # ==================== 用户兴趣图谱 API ====================

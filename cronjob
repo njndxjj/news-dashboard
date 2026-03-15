@@ -1,0 +1,2 @@
+# 每 10 分钟执行一次爬虫任务
+*/10 * * * * root cd /app && python run_crawlers.py >> /var/log/cron/crawler.log 2>&1

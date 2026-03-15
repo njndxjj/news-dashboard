@@ -1,0 +1,67 @@
+# Railway 部署优化版 Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 设置环境变量
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PYTHONUNBUFFERED=1
+
+# 安装系统依赖（包括 cron 和 supervisor）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
+    ca-certificates \
+    libgbm1 \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    chromium \
+    cron \
+    supervisor \
+    curl \
+    git && \
+    rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制应用代码
+COPY monitor_app.py .
+COPY database.py .
+COPY feishu_push.py .
+COPY run_crawlers.py .
+COPY crawlers/ crawlers/
+COPY templates/ templates/
+COPY static/ static/
+COPY config/ config/
+
+# 复制 supervisor 配置文件
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# 复制 cron 配置文件
+COPY cronjob /etc/cron.d/news-cron
+RUN chmod 0644 /etc/cron.d/news-cron
+
+# 创建数据目录和日志目录
+RUN mkdir -p /app/data /var/log/supervisor /var/log/cron
+
+# 暴露端口（Railway 自动识别）
+EXPOSE 5000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:5000/api/news || exit 1
+
+# 使用 supervisord 同时管理 cron 和 Flask
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
