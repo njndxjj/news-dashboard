@@ -68,6 +68,10 @@ docker-compose.override.yml
 
 # 文档
 DEPLOY.md
+# Lumos 项目文档（允许）
+Lumos/*.md
+Lumos/**/*.md
+# 其他 MD 文件（忽略）
 *.md
 !README.md
 !LICENSE

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, send_from_directory
 from flask_cors import CORS
 import feedparser
 import datetime
@@ -983,13 +983,17 @@ def fetch_all_news():
 
 @app.route('/')
 def index():
-    """首页 - 添加禁止缓存头"""
-    response = render_template('index-elegant.html')
-    response = app.make_response(response)
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    """首页 - 提供生产构建的前端静态文件"""
+    return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'index.html')
+
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """提供前端静态资源（JS、CSS 等）"""
+    if path.startswith('api/'):
+        # API 请求不处理，交给下面的路由
+        return None
+    return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', path)
 
 @app.route('/api/news')
 def get_news_route():
