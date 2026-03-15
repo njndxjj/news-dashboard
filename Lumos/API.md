@@ -1,14 +1,16 @@
 # Lumos API 接口文档
 
-本文档详细描述了 Lumos 平台提供的所有 REST API 接口。
+本文档详细描述了 Lumos 商家洞察系统提供的所有 REST API 接口。
 
 ---
 
 ## 📡 基础信息
 
 ### API 地址
-- **开发环境**: `http://localhost:5100/api`
-- **生产环境**: `https://your-domain.com/api`
+| 环境 | 地址 |
+|------|------|
+| **开发环境** | `http://localhost:5100/api` |
+| **生产环境** | `https://your-domain.com/api` |
 
 ### 通用响应格式
 ```json
@@ -100,7 +102,7 @@ Authorization: Bearer <unique_id>
   "phone": "13800138000",
   "email": "zhangsan@example.com",
   "verification_code": "123456",
-  "keywords": "AI,创业，融资"
+  "keywords": "AI，创业，融资"
 }
 ```
 
@@ -567,7 +569,7 @@ const registerResponse = await fetch('http://localhost:5100/api/users/register',
   body: JSON.stringify({
     username: 'Test User',
     phone: '',
-    keywords: 'AI,创业'
+    keywords: 'AI，创业'
   })
 });
 const registerData = await registerResponse.json();
@@ -594,4 +596,5 @@ unique_id = response.json()['data']['unique_id']
 
 ---
 
+*Lumos Team © 2026*
 *最后更新：2026-03-15*

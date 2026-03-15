@@ -1,6 +1,6 @@
 # Lumos 项目文档索引
 
-这是 Lumos 项目的完整文档导航，帮助你快速找到所需信息。
+这是 Lumos 商家洞察系统的完整文档导航，帮助你快速找到所需信息。
 
 ---
 
@@ -78,7 +78,7 @@
 ## 🔍 快速查找
 
 ### 想了解系统支持哪些数据源？
-📌 查看 [README.md](README.md#-支持的数据源) 或 [config/config.yaml](config/config.yaml)
+📌 查看 [README.md](README.md#-数据源覆盖) 或 [config/config.yaml](config/config.yaml)
 
 ### 想知道如何部署？
 📌 查看 [QUICKSTART.md](QUICKSTART.md#-部署方式)
@@ -121,7 +121,7 @@
 
 如果你发现文档有问题或有改进建议：
 
-1. **提交 Issue**: https://github.com/njndxjj/lumos/issues
+1. **提交 Issue**: https://github.com/njndxjj/news-dashboard/issues
 2. **提交 PR**: Fork 项目 → 修改文档 → 提交 PR
 
 **文档规范**:
@@ -134,22 +134,22 @@
 
 ## 📞 获取帮助
 
-- **GitHub Issues**: https://github.com/njndxjj/lumos/issues
+- **GitHub Issues**: https://github.com/njndxjj/news-dashboard/issues
 - **开发团队**: Lumos Team
 
 ---
 
 ## 📝 文档更新日志
 
-### 2026-03-15
-- ✅ 创建主 README.md
-- ✅ 创建架构设计文档 ARCHITECTURE.md
-- ✅ 创建快速开始指南 QUICKSTART.md
-- ✅ 创建 API 接口文档 API.md
-- ✅ 创建开发者指南 DEVELOPER_GUIDE.md
-- ✅ 更新后端 README.md
-- ✅ 更新前端 README.md
-- ✅ 创建文档索引 INDEX.md
+### 2026-03-15 - 文档全面重写
+- ✅ 重写 README.md - 重新定位为商家洞察系统
+- ✅ 重写 ARCHITECTURE.md - 更新项目背景和技术架构
+- ✅ 重写 QUICKSTART.md - 更新快速开始指南
+- ✅ 重写 API.md - 更新 API 接口文档
+- ✅ 重写 DEVELOPER_GUIDE.md - 更新开发指南
+- ✅ 更新 backend/README.md - 后端服务说明
+- ✅ 更新 frontend-new/README.md - 前端应用说明
+- ✅ 更新 INDEX.md - 文档索引
 
 ---
 
@@ -160,3 +160,5 @@
 [⬆ 返回顶部](#lumos-项目文档索引)
 
 </div>
+
+*Lumos Team © 2026*

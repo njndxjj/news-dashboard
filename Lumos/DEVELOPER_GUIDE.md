@@ -1,6 +1,6 @@
 # Lumos 开发人员指南
 
-本文档面向 Lumos 项目的开发者，介绍开发环境搭建、代码规范、调试技巧等信息。
+本文档面向 Lumos 商家洞察系统项目的开发者，介绍开发环境搭建、代码规范、调试技巧等信息。
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/njndxjj/lumos.git
+git clone https://github.com/njndxjj/news-dashboard.git
 cd Lumos
 ```
 
@@ -38,7 +38,7 @@ npm install -D @types/node prettier eslint
 ### 4. 数据库初始化
 ```bash
 # SQLite
-python database_init.py
+python backend/database_init.py
 
 # Neo4j (可选)
 # 使用 Docker 启动
@@ -158,30 +158,6 @@ pytest backend/tests/test_user_module.py::test_register_user -v
 pytest backend/tests/ --cov=backend --cov-report=html
 ```
 
-**测试示例**:
-```python
-# backend/tests/test_user_module.py
-import pytest
-from backend.user_module import register_user
-
-def test_register_guest():
-    """测试游客注册"""
-    result = register_user({
-        "username": "Guest",
-        "phone": "",
-        "keywords": ""
-    })
-    assert result["success"] is True
-    assert "unique_id" in result["data"]
-
-def test_register_with_phone():
-    """测试手机号注册"""
-    # 先发送验证码
-    # 再验证验证码
-    # 最后注册
-    pass
-```
-
 ### 前端测试
 
 ```bash
@@ -193,36 +169,6 @@ npm run test:e2e
 
 # 单文件测试
 npm test -- src/components/HotNews.test.js
-```
-
-**测试示例**:
-```jsx
-// src/components/HotNews.test.js
-import { render, screen, fireEvent } from '@testing-library/react';
-import HotNews from './HotNews';
-
-test('渲染新闻列表', () => {
-  const mockNews = [
-    { id: 1, title: '新闻 1' },
-    { id: 2, title: '新闻 2' }
-  ];
-
-  render(<HotNews newsList={mockNews} />);
-
-  expect(screen.getByText('新闻 1')).toBeInTheDocument();
-  expect(screen.getByText('新闻 2')).toBeInTheDocument();
-});
-
-test('点击新闻触发回调', () => {
-  const handleClick = jest.fn();
-  const mockNews = [{ id: 1, title: '新闻 1' }];
-
-  render(<HotNews newsList={mockNews} onNewsClick={handleClick} />);
-
-  fireEvent.click(screen.getByText('新闻 1'));
-
-  expect(handleClick).toHaveBeenCalledWith(mockNews[0]);
-});
 ```
 
 ---
@@ -278,16 +224,6 @@ function handleLogin() {
   debugger;  // 浏览器会在此暂停
   // ...
 }
-```
-
-**网络请求调试**:
-```javascript
-// 在浏览器 DevTools 中查看 Network 标签
-// 或者使用 fetch 拦截器
-fetch('/api/news/hot')
-  .then(response => response.json())
-  .then(data => console.log('API 响应:', data))
-  .catch(error => console.error('API 错误:', error));
 ```
 
 ---
@@ -534,9 +470,10 @@ chore: 构建/工具相关
 
 ## 📞 联系方式
 
-- **GitHub Issues**: https://github.com/njndxjj/lumos/issues
+- **GitHub Issues**: https://github.com/njndxjj/news-dashboard/issues
 - **开发群**: (内部群)
 
 ---
 
+*Lumos Team © 2026*
 *最后更新：2026-03-15*
