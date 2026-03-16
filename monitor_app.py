@@ -13,6 +13,7 @@ import yaml
 from functools import lru_cache
 from collections import Counter, defaultdict
 import logging
+from database import DB_PATH  # 导入数据库路径
 from Lumos.backend.user_module import user_bp
 
 # 配置日志
