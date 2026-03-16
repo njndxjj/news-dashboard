@@ -45,8 +45,10 @@ COPY feishu_push.py .
 COPY run_crawlers.py .
 COPY crawlers/ crawlers/
 COPY templates/ templates/
-COPY static/ static/
 COPY config/ config/
+
+# 创建 static 目录（可能为空）
+RUN mkdir -p /app/static
 # 复制 Lumos 模块（包含 user_module 等）
 COPY Lumos/ Lumos/
 
