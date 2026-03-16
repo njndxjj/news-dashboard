@@ -1,12 +1,11 @@
 """
-今日头条爬虫
+今日头条爬虫 - API 方式
 """
 
 import asyncio
 import logging
-import json
 from typing import List
-from playwright.async_api import async_playwright
+import httpx
 from .base import BaseCrawler, NewsItem
 
 logger = logging.getLogger(__name__)
@@ -22,31 +21,21 @@ class ToutiaoCrawler(BaseCrawler):
         """抓取今日头条热榜 - 使用 API 方式"""
         news_list = []
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                ]
-            )
-            context = await browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
-            page = await context.new_page()
+        # 今日头条热榜 API
+        url = "https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.toutiao.com/'
+        }
 
+        async with httpx.AsyncClient() as client:
             try:
-                # 直接访问热榜 API
-                await page.goto('https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc', wait_until='networkidle', timeout=30000)
-                await asyncio.sleep(2)
+                response = await client.get(url, headers=headers, timeout=30.0)
 
-                # 获取页面文本内容（JSON 格式）
-                content = await page.inner_text('body')
+                if response.status_code != 200:
+                    raise Exception(f"API 返回状态码：{response.status_code}")
 
-                # 解析 JSON
-                data = json.loads(content.strip())
+                data = response.json()
 
                 # 提取数据
                 if isinstance(data, dict) and 'data' in data:
@@ -69,12 +58,10 @@ class ToutiaoCrawler(BaseCrawler):
                             logger.warning(f"解析头条新闻项失败：{e}")
                             continue
 
-                logger.info(f"今日头条抓取完成，共 {len(news_list)} 条")
+                logger.info(f"今日头条 API 抓取完成，共 {len(news_list)} 条")
 
             except Exception as e:
-                logger.error(f"今日头条抓取失败：{e}")
-
-            finally:
-                await browser.close()
+                logger.error(f"今日头条 API 抓取失败：{e}")
+                raise
 
         return news_list

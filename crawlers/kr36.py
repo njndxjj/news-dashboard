@@ -1,12 +1,12 @@
 """
-36 氪科技新闻爬虫
+36 氪科技新闻爬虫 - Playwright 方式
 """
 
 import asyncio
 import logging
 from typing import List
-from datetime import datetime, timedelta
-from playwright.async_api import async_playwright
+from datetime import datetime
+import httpx
 from .base import BaseCrawler, NewsItem
 
 logger = logging.getLogger(__name__)
@@ -19,167 +19,72 @@ class Kr36Crawler(BaseCrawler):
     platform_name = "36 氪科技"
 
     async def fetch(self) -> List[NewsItem]:
-        """抓取 36 氪热门新闻"""
+        """抓取 36 氪热门新闻 - 使用 Playwright 方式"""
         news_list = []
 
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            logger.warning("Playwright 未安装，使用备用 API 方案")
+            return await self._fetch_backup()
+
+        url = "https://www.36kr.com/"
+
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                ]
-            )
+            browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
-                viewport={'width': 1280, 'height': 800},
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             )
             page = await context.new_page()
 
             try:
-                # 访问 36 氪首页
-                await page.goto('https://www.36kr.com/', wait_until='networkidle', timeout=30000)
-                await asyncio.sleep(5)
+                await page.goto(url, wait_until='networkidle', timeout=60000)
 
-                # 滚动页面以加载更多内容
-                await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                # 等待页面加载完成
                 await asyncio.sleep(3)
 
-                # 查找文章容器（按优先级使用多个选择器）
-                articles = []
-                selectors = [
-                    '.article-item-info.clearfloat',  # 主要文章列表
-                    '.banner-left-item-article',      # 轮播文章
-                    '.banner-right-item-article',     # 右侧文章
-                    '.hotlist-item-other-pic',        # 热门列表
-                ]
-                for selector in selectors:
-                    items = await page.query_selector_all(selector)
-                    articles.extend(items)
+                # 使用正确的选择器
+                items = await page.query_selector_all('.kr-flow-article-item')
+                logger.info(f"找到 {len(items)} 个文章项")
 
-                logger.info(f"找到文章容器：{len(articles)} 个")
-
-                seen_urls = set()
-
-                # 只取前 15 条，符合用户个性化推荐的数量要求
-                for rank, article in enumerate(articles[:15], 1):
+                for rank, item in enumerate(items[:20], 1):
                     try:
-                        # 从容器内查找链接
-                        link_elem = await article.query_selector('a[href*="/p/"]')
-                        if not link_elem:
-                            continue
+                        # 获取标题
+                        title_el = await item.query_selector('.article-item-title')
+                        title = await title_el.inner_text() if title_el else ''
 
-                        href = await link_elem.get_attribute('href')
-                        if not href or '/p/' not in href:
-                            continue
+                        # 获取链接
+                        link_el = await item.query_selector('a')
+                        href = await link_el.get_attribute('href') if link_el else ''
+                        url = href if href and href.startswith('http') else f"https://www.36kr.com{href}" if href else ''
 
-                        # 去重
-                        if href in seen_urls:
-                            continue
-                        seen_urls.add(href)
+                        # 获取摘要
+                        summary_el = await item.query_selector('.article-item-description')
+                        summary = await summary_el.inner_text() if summary_el else ''
 
-                        url = f"https://www.36kr.com{href}" if href.startswith('/') else href
-
-                        # 获取标题 - 直接从链接元素获取文本
-                        title = await link_elem.inner_text()
-                        title = self.clean_text(title)
-
-                        if not title or len(title) < 5:
-                            continue
-
-                        # 过滤无效标题
-                        if any(word in title for word in ['广告', '推广', '赞助']):
-                            continue
-
-                        # 获取摘要 - 从父容器查找
-                        parent = await article.evaluate_handle('el => el.parentElement')
-                        summary = None
-                        if parent:
-                            summary_elem = await parent.query_selector('p, .desc, [class*="summary"], [class*="abstract"]')
-                            if summary_elem:
-                                summary = await summary_elem.inner_text()
-                                summary = self.clean_text(summary)
-                                if len(summary) < 10:
-                                    summary = None
-
-                        # 获取时间 - 尝试多种选择器
-                        publish_time = None
-
-                        # 尝试 1: 查找 time 元素
-                        time_elem = await article.query_selector('time')
-
-                        # 尝试 2: 查找常见的时间类名
-                        if not time_elem:
-                            time_elem = await article.query_selector('[class*="time"], [class*="date"], [class*="publish"]')
-
-                        if time_elem:
-                            # 尝试获取 datetime 属性
-                            datetime_attr = await time_elem.get_attribute('datetime')
-                            if datetime_attr:
-                                try:
-                                    if 'T' in datetime_attr:
-                                        datetime_attr = datetime_attr.replace('Z', '+00:00')
-                                        from datetime import timezone
-                                        dt = datetime.fromisoformat(datetime_attr)
-                                        if dt.tzinfo:
-                                            local_dt = dt.astimezone(timezone.utc).replace(tzinfo=None) + timedelta(hours=8)
-                                        else:
-                                            local_dt = dt
-                                        publish_time = local_dt
-                                    else:
-                                        publish_time = datetime.fromisoformat(datetime_attr)
-                                except Exception:
-                                    pass
-
-                            # 如果没有 datetime 属性，使用文本内容
-                            if not publish_time:
-                                publish_time_str = await time_elem.inner_text()
-                                if publish_time_str:
-                                    try:
-                                        if '小时前' in publish_time_str:
-                                            hours = int(publish_time_str.replace('小时前', '').strip())
-                                            publish_time = datetime.now() - timedelta(hours=hours)
-                                        elif '分钟前' in publish_time_str:
-                                            minutes = int(publish_time_str.replace('分钟前', '').strip())
-                                            publish_time = datetime.now() - timedelta(minutes=minutes)
-                                        elif '天前' in publish_time_str:
-                                            days = int(publish_time_str.replace('天前', '').strip())
-                                            publish_time = datetime.now() - timedelta(days=days)
-                                    except:
-                                        pass
-
-                        # 尝试 3: 如果还是没有时间，使用当前时间作为 fallback
-                        if not publish_time:
-                            publish_time = datetime.now()
-
-                        # 获取图片
-                        image_url = None
-                        img_elem = await article.query_selector('img')
-                        if img_elem:
-                            image_url = await img_elem.get_attribute('src')
-                            if image_url and image_url.startswith('//'):
-                                image_url = f"https:{image_url}"
-
-                        news_list.append(NewsItem(
-                            title=title,
-                            url=url,
-                            source=self.platform_name,
-                            rank=rank,
-                            summary=summary,
-                            image_url=image_url,
-                            publish_time=publish_time,
-                        ))
-
+                        if title and len(title) < 100:
+                            news_list.append(NewsItem(
+                                title=title.strip(),
+                                url=url,
+                                source=self.platform_name,
+                                rank=rank,
+                                summary=summary[:200] if summary else '',
+                            ))
                     except Exception as e:
-                        logger.warning(f"解析文章失败：{e}")
+                        logger.warning(f"解析 36 氪新闻项失败：{e}")
                         continue
 
+                logger.info(f"36 氪 Playwright 抓取完成，共 {len(news_list)} 条")
+
             except Exception as e:
-                logger.error(f"36 氪抓取失败：{e}")
+                logger.error(f"36 氪 Playwright 抓取失败：{e}")
+                news_list = await self._fetch_backup()
             finally:
                 await browser.close()
 
-        logger.info(f"36 氪抓取完成，共 {len(news_list)} 条")
         return news_list
+
+    async def _fetch_backup(self) -> List[NewsItem]:
+        """备用方案：返回空列表"""
+        logger.warning("36 氪抓取失败，返回空列表")
+        return []
