@@ -58,7 +58,7 @@ EOF
 # 6. 创建环境变量文件
 cat > .env << 'EOF'
 # 通义千问 API Key
-DASHSCOPE_API_KEY=sk-1acde23fddbd4a83bd0aa451a6a60a47
+DASHSCOPE_API_KEY=
 
 # 飞书 Webhook（可选）
 FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/your_webhook_here
