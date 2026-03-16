@@ -36,7 +36,8 @@ RUN apt-get -o Acquire::AllowInsecureRepositories=true update && \
 
 # 安装 Python 依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.org/simple && \
+    playwright install chromium
 
 # 复制应用代码
 COPY monitor_app.py .
