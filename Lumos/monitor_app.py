@@ -2701,7 +2701,7 @@ if __name__ == '__main__':
     print('📊 舆情监控系统启动')
     print('=' * 60)
     print(f'服务地址：http://localhost:5000')
-    print(f'数据库路径：/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3')
+    print(f'数据库路径：{DB_PATH}')
     print(f'爬虫平台：{len(CRAWLER_IMPLEMENTED)} 个')
     print(f'RSS 源：国内 {len(RSS_FEEDS_DOMESTIC)} 个，国外 {len(RSS_FEEDS_OVERSEAS)} 个')
     print('=' * 60)

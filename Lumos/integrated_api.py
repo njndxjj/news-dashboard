@@ -26,8 +26,9 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 添加项目根目录到 Python 路径
-sys.path.append('/Users/bs-00008898/OpenClaw_Data/Lumos')
+# 添加项目根目录到 Python 路径（支持本地开发和服务器部署）
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT_DIR)
 
 # 导入数据库模块
 try:
@@ -40,8 +41,9 @@ except ImportError as e:
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
-# 数据库配置
-DB_PATH = '/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3'
+# 数据库配置（支持本地开发和服务器部署）
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'database.sqlite3'))
 
 def get_db_connection():
     """获取数据库连接"""

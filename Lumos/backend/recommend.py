@@ -8,10 +8,8 @@ recommend_bp = Blueprint('recommend', __name__)
 
 # 获取数据库路径
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# 优先使用 OpenClaw_Data 目录的数据库（如果存在），否则使用本地数据库
-ALT_DB_PATH = "/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3"
-LOCAL_DB_PATH = os.path.join(CURRENT_DIR, "..", "database.sqlite3")
-DB_PATH = ALT_DB_PATH if os.path.exists(ALT_DB_PATH) else LOCAL_DB_PATH
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(CURRENT_DIR, '..', 'database.sqlite3'))
 
 
 def get_db_connection():

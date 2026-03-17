@@ -12,8 +12,9 @@ BACKEND_DIR = os.path.join(os.path.dirname(__file__), 'backend')
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-# 数据库文件路径
-DB_PATH = '/Users/bs-00008898/OpenClaw_Data/Lumos/database.sqlite3'
+# 数据库文件路径（支持本地开发和服务器部署）
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'database.sqlite3'))
 DB_DIR = os.path.dirname(DB_PATH)
 
 # 确保数据目录存在
