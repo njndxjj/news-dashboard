@@ -263,7 +263,7 @@ from database import (
     get_news_count, get_latest_published, save_push_log, get_news_by_channel,
     get_user_interests, record_user_click, get_user_click_history, get_personalized_news,
     PRESET_INTEREST_CATEGORIES, add_user_interest, get_db_connection, clear_user_interests,
-    save_ai_analysis, get_ai_analysis,
+    save_ai_analysis, get_ai_analysis, DB_PATH,
     # 用户兴趣图谱函数
     upsert_interest_graph, get_user_interest_graph, get_user_interest_network,
     apply_interest_decay, get_related_interests
