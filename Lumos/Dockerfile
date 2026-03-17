@@ -13,6 +13,10 @@ COPY backend/requirements.txt /app/
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 安装 Playwright 浏览器依赖
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
 # 复制后端代码
 COPY backend/ /app/backend/
 COPY *.py /app/

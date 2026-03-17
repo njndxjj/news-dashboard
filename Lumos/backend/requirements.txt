@@ -9,3 +9,7 @@ python-dotenv
 pyyaml
 scikit-learn
 celery
+playwright
+httpx
+schedule
+psutil
