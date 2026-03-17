@@ -51,6 +51,7 @@ logs/
 data/*.db
 data/*.db-*
 !data/.gitkeep
+database.sqlite3
 
 # 临时文件
 tmp/

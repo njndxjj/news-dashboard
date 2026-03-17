@@ -1029,6 +1029,181 @@ def get_news_by_channel_route():
 # PRESET_INTEREST_CATEGORIES = {}
 
 
+# ==================== 用户认证与订阅 API ====================
+
+# 简单的内存验证码存储（生产环境建议使用 Redis）
+_verification_codes = {}
+
+
+@app.route('/api/users/register', methods=['POST'])
+def register_user():
+    """用户注册（支持游客登录和手机号注册）"""
+    from snowflake_id import generate_uuid
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    username = data.get('username', 'Guest')
+    phone = data.get('phone', '')
+    verification_code = data.get('verification_code', '')
+    keywords = data.get('keywords', '')
+
+    # 如果是注册用户（非游客），验证手机号和验证码
+    if username != 'Guest' and phone:
+        # 验证手机号格式
+        phone_regex = r'^1[3-9]\d{9}$'
+        if not re.match(phone_regex, phone):
+            return jsonify({'error': '手机号格式不正确'}), 400
+
+        # 验证验证码
+        if not verification_code:
+            return jsonify({'error': '请输入验证码'}), 400
+
+        expected_code = _verification_codes.get(phone)
+        if not expected_code or str(verification_code) != str(expected_code):
+            return jsonify({'error': '验证码错误'}), 401
+
+        # 验证通过后删除验证码
+        del _verification_codes[phone]
+
+    # 生成唯一 ID
+    unique_id = generate_uuid()
+
+    # 保存到数据库
+    keywords_str = keywords if isinstance(keywords, str) else ','.join(keywords) if keywords else ''
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO Users (username, phone, subscribed_keywords, unique_id)
+            VALUES (?, ?, ?, ?)
+        ''', (username, phone, keywords_str, unique_id))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"用户注册成功：{username}, unique_id: {unique_id}")
+
+        return jsonify({
+            'success': True,
+            'unique_id': unique_id,
+            'username': username
+        })
+    except Exception as e:
+        logger.error(f"用户注册失败：{e}")
+        return jsonify({'error': '注册失败'}), 500
+
+
+@app.route('/api/users/send-code', methods=['POST'])
+def send_verification_code():
+    """发送验证码（模拟，实际可接入短信服务）"""
+    import random
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    phone = data.get('phone')
+    if not phone:
+        return jsonify({'error': '缺少手机号'}), 400
+
+    # 验证手机号格式
+    phone_regex = r'^1[3-9]\d{9}$'
+    if not re.match(phone_regex, phone):
+        return jsonify({'error': '手机号格式不正确'}), 400
+
+    # 生成 6 位验证码
+    code = str(random.randint(100000, 999999))
+
+    # 存储验证码（5 分钟有效）
+    _verification_codes[phone] = code
+
+    logger.info(f"验证码已发送：{phone}, 验证码：{code}")
+
+    # TODO: 实际场景中应该调用短信 API 发送验证码
+    # 这里只是在日志中打印，方便测试
+
+    return jsonify({
+        'success': True,
+        'message': '验证码已发送（请查看服务器日志）'
+    })
+
+
+@app.route('/api/users/subscriptions', methods=['GET'])
+def get_user_subscriptions():
+    """获取用户订阅的关键词"""
+    user_id = request.args.get('user_id', 'default')
+
+    try:
+        # 从数据库获取用户
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM Users WHERE unique_id = ?', (user_id,))
+        user = cursor.fetchone()
+        conn.close()
+
+        if not user:
+            return jsonify({
+                'keywords': [],
+                'is_default': True
+            })
+
+        # 解析订阅的关键词
+        keywords_str = user['subscribed_keywords'] or ''
+        keywords = [k.strip() for k in keywords_str.split(',') if k.strip()]
+
+        return jsonify({
+            'keywords': keywords,
+            'is_default': len(keywords) == 0
+        })
+    except Exception as e:
+        logger.error(f"获取用户订阅失败：{e}")
+        return jsonify({'error': '获取失败'}), 500
+
+
+@app.route('/api/users/subscriptions', methods=['PUT'])
+def update_user_subscriptions():
+    """更新用户订阅的关键词"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '无效请求'}), 400
+
+    user_id = data.get('user_id')
+    keywords = data.get('keywords', [])
+
+    if not user_id:
+        return jsonify({'error': '缺少 user_id'}), 400
+
+    try:
+        # 将关键词列表转换为逗号分隔的字符串
+        keywords_str = ','.join(keywords) if isinstance(keywords, list) else keywords
+
+        # 更新数据库
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE Users
+            SET subscribed_keywords = ?
+            WHERE unique_id = ?
+        ''', (keywords_str, user_id))
+        conn.commit()
+        conn.close()
+
+        logger.info(f"用户 {user_id} 更新订阅：{keywords_str}")
+
+        return jsonify({
+            'success': True,
+            'keywords': keywords
+        })
+    except Exception as e:
+        logger.error(f"更新用户订阅失败：{e}")
+        return jsonify({'error': '更新失败'}), 500
+
+
+# ==================== 用户兴趣 API ====================
+
+
 @app.route('/api/user/interests', methods=['GET'])
 def api_get_user_interests():
     """获取用户兴趣标签"""
