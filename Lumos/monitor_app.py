@@ -993,12 +993,21 @@ def admin_page():
     return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'admin.html')
 
 
+@app.route('/api/health')
+def api_health():
+    """健康检查接口"""
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.datetime.now().isoformat()
+    })
+
+
 @app.route('/<path:path>')
 def serve_static(path):
     """提供前端静态资源（JS、CSS 等）"""
+    # API 请求不处理，交给下面的路由
     if path.startswith('api/'):
-        # API 请求不处理，交给下面的路由
-        return None
+        return jsonify({'error': 'API endpoint not found', 'path': path}), 404
     return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', path)
 
 @app.route('/api/news')
