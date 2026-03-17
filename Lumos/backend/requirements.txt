@@ -6,3 +6,4 @@ beautifulsoup4
 neo4j
 dashscope
 python-dotenv
+pyyaml
