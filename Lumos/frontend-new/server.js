@@ -33,11 +33,11 @@ app.use('/api', (req, res, next) => {
   });
 });
 
-// 静态文件服务（public 目录）
-app.use(express.static(path.join(__dirname, 'public')));
+// 静态文件服务（dist 目录）
+app.use(express.static(path.join(__dirname, 'dist')));
 
 app.get('/*path', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {

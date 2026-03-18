@@ -53,7 +53,9 @@ data/*.db-*
 !data/.gitkeep
 database.sqlite3
 Lumos/database.sqlite3
+Lumos/database.sqlite3-*
 **/database.sqlite3
+**/database.sqlite3-*
 
 # 临时文件
 tmp/

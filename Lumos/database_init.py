@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS Articles (
     keywords TEXT NOT NULL,
     source_id INTEGER,
     published_at TIMESTAMP,
+    category TEXT NOT NULL DEFAULT '',
+    views INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(source_id) REFERENCES NewsSources(id)
 );
 """)
@@ -49,6 +51,23 @@ connection.commit()
 connection.close()
 
 print("数据库表已创建成功！")
+
+# 数据库迁移：为 Articles 表添加缺失的字段
+connection = sqlite3.connect(DB_PATH)
+cursor = connection.cursor()
+
+# 检查 category 字段是否存在
+columns = [col[1] for col in cursor.execute("PRAGMA table_info(Articles)").fetchall()]
+if 'category' not in columns:
+    cursor.execute("ALTER TABLE Articles ADD COLUMN category TEXT NOT NULL DEFAULT ''")
+    print("已为 Articles 表添加 category 字段")
+if 'views' not in columns:
+    cursor.execute("ALTER TABLE Articles ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
+    print("已为 Articles 表添加 views 字段")
+
+connection.commit()
+connection.close()
+print("数据库迁移完成！")
 
 def update_rss_data(rss_url):
     feed = feedparser.parse(rss_url)

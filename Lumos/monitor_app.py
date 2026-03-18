@@ -993,6 +993,12 @@ def admin_page():
     return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'admin.html')
 
 
+@app.route('/admin/behavior')
+def behavior_page():
+    """用户行为分析页面"""
+    return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'behavior.html')
+
+
 @app.route('/api/health')
 def api_health():
     """健康检查接口"""
