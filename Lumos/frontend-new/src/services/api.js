@@ -487,9 +487,9 @@ export const getCrawlersStatus = async () => {
 };
 
 /**
- * 手动运行爬虫
+ * 手动运行爬虫（管理后台）
  */
-export const runCrawlers = async () => {
+export const runAdminCrawlers = async () => {
   return apiClient.post('/admin/crawlers/run');
 };
 
