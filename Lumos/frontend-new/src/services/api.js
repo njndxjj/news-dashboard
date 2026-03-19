@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// 使用相对路径，通过 webpack devServer 代理转发到后端
-const API_BASE_URL = '/api';
+// 生产环境：直接请求后端 5000 端口
+// 开发环境可以通过 webpack devServer 代理配置使用相对路径
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // 创建 axios 实例
 const apiClient = axios.create({
@@ -18,6 +19,7 @@ apiClient.interceptors.request.use(
     // 从 localStorage 获取 unique_id
     const userId = localStorage.getItem('unique_id') || 'default';
     config.headers['X-User-ID'] = userId;
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -415,6 +417,29 @@ export const getPushLogs = async (limit = 50) => {
  */
 export const getStats = async () => {
   return apiClient.get('/stats');
+};
+
+// ==================== 数据采集管理 API ====================
+
+/**
+ * 获取定时任务状态
+ */
+export const getSchedulerStatus = async () => {
+  return apiClient.get('/scheduler/status');
+};
+
+/**
+ * 立即运行爬虫
+ */
+export const runCrawlers = async () => {
+  return apiClient.post('/crawlers/run');
+};
+
+/**
+ * 触发数据采集
+ */
+export const triggerCollection = async () => {
+  return apiClient.post('/collect');
 };
 
 export default apiClient;

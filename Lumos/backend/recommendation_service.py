@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 import sqlite3
+import os
 
 app = Flask(__name__)
-DB_PATH = "database.sqlite3"
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), '..', 'database.sqlite3'))
 
 # 推荐内容逻辑
 @app.route('/api/recommendations', methods=['POST'])

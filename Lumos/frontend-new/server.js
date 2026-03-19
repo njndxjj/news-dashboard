@@ -36,6 +36,22 @@ app.use('/api', (req, res, next) => {
 // 静态文件服务（dist 目录）
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// 用户行为分析路由 (必须在 /admin 之前)
+app.get('/admin/behavior', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'behavior.html'));
+});
+
+// 兴趣图谱路由
+app.get('/admin/interest-graph', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'interest-graph.html'));
+});
+
+// 管理后台路由
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'admin.html'));
+});
+
+// 默认路由
 app.get('/*path', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });

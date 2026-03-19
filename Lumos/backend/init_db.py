@@ -4,9 +4,8 @@
 import sqlite3
 import os
 
-# 获取当前文件的目录，并构建相对路径
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(CURRENT_DIR, "..", "database.sqlite3")
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), '..', 'database.sqlite3'))
 
 def init_db():
     """初始化数据库表结构"""

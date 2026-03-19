@@ -5,6 +5,7 @@ import datetime
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import time
+import threading
 import re
 import urllib.request
 import json
@@ -14,10 +15,17 @@ from functools import lru_cache
 from collections import Counter, defaultdict
 import logging
 import secrets
+from dotenv import load_dotenv
+from pathlib import Path
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# 加载环境变量（从项目根目录的 .env 文件）
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+logger.info(f"[初始化] 加载 .env 文件：{env_path}，存在={env_path.exists()}")
 
 # 通义千问 API 配置
 DASHSCOPE_API_KEY = os.environ.get('DASHSCOPE_API_KEY')
@@ -210,7 +218,8 @@ app = Flask(__name__, template_folder='templates')
 app.secret_key = secrets.token_hex(16)  # 用于 session 加密
 
 # 启用 CORS，允许所有来源访问（仅用于本地测试）
-CORS(app)
+# 明确配置允许的方法、标头等，确保 OPTIONS 预检请求正常响应
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization", "X-User-Id"]}})
 
 # ==================== 管理员权限配置 ====================
 
@@ -995,7 +1004,7 @@ def admin_page():
 
 @app.route('/admin/behavior')
 def behavior_page():
-    """用户行为分析页面"""
+    """用户行为分析页面 - React 构建的前端文件"""
     return send_from_directory('/Users/bs-00008898/lobsterai/project/Lumos/frontend-new/dist', 'behavior.html')
 
 
@@ -1621,9 +1630,8 @@ def api_get_behavior_events():
 # ==================== 用户兴趣图谱 API ====================
 
 @app.route('/api/user/interest-graph', methods=['GET'])
-@require_admin
 def api_get_user_interest_graph():
-    """获取用户兴趣图谱（知识图谱结构）- 需要管理员权限"""
+    """获取用户兴趣图谱（知识图谱结构）"""
     user_id = request.args.get('user_id', 'default')
     limit = request.args.get('limit', 50, type=int)
     entity_type = request.args.get('entity_type')  # 可选的实体类型过滤
@@ -1637,9 +1645,8 @@ def api_get_user_interest_graph():
 
 
 @app.route('/api/user/interest-graph/network', methods=['GET'])
-@require_admin
 def api_get_user_interest_network():
-    """获取用户兴趣网络（用于知识图谱可视化）- 需要管理员权限"""
+    """获取用户兴趣网络（用于知识图谱可视化）"""
     user_id = request.args.get('user_id', 'default')
 
     network = get_user_interest_network(user_id=user_id)
@@ -1648,9 +1655,8 @@ def api_get_user_interest_network():
 
 
 @app.route('/api/user/interest-graph/upsert', methods=['POST'])
-@require_admin
 def api_upsert_interest_graph():
-    """添加或更新用户兴趣图谱记录 - 需要管理员权限"""
+    """添加或更新用户兴趣图谱记录"""
     data = request.get_json()
     if not data:
         return jsonify({'error': '无效请求'}), 400
@@ -1685,9 +1691,8 @@ def api_upsert_interest_graph():
 
 
 @app.route('/api/user/interest-graph/related', methods=['GET'])
-@require_admin
 def api_get_related_interests():
-    """获取关联兴趣推荐（协同过滤）- 需要管理员权限"""
+    """获取关联兴趣推荐（协同过滤）"""
     user_id = request.args.get('user_id', 'default')
     entity_type = request.args.get('entity_type')
     entity_name = request.args.get('entity_name')
@@ -1707,9 +1712,8 @@ def api_get_related_interests():
 
 
 @app.route('/api/user/interest-graph/decay', methods=['POST'])
-@require_admin
 def api_apply_interest_decay():
-    """应用时间衰减到用户兴趣（定时任务调用）- 需要管理员权限"""
+    """应用时间衰减到用户兴趣（定时任务调用）"""
     data = request.get_json() or {}
     user_id = data.get('user_id', 'default')
     min_days = data.get('min_days', 1)
@@ -1724,9 +1728,7 @@ def api_apply_interest_decay():
 
 @app.route('/interest-graph')
 def interest_graph_page():
-    """用户兴趣图谱可视化页面 - 需要管理员登录"""
-    if not session.get('is_admin'):
-        return render_template('interest_graph.html', login_required=True)
+    """用户兴趣图谱可视化页面"""
     return render_template('interest_graph.html')
 
 
@@ -1804,10 +1806,41 @@ def admin_check():
 
 @app.route('/api/stats')
 def get_stats():
-    """获取统计信息"""
+    """获取统计信息（增强版 - 包含用户数、推送规则等）"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 总用户数
+    cursor.execute("SELECT COUNT(*) FROM Users")
+    total_users = cursor.fetchone()[0]
+
+    # 新闻总数
+    total_news = get_news_count()
+
+    # 推送规则数
+    cursor.execute("SELECT COUNT(*) FROM push_rules")
+    push_rules_count = cursor.fetchone()[0]
+
+    # 今日浏览数（从今天凌晨开始）
+    today_start = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
+    try:
+        cursor.execute("SELECT COUNT(*) FROM user_behaviors WHERE timestamp >= ?", (today_start,))
+        today_views = cursor.fetchone()[0]
+    except Exception:
+        # 表不存在时返回 0
+        today_views = 0
+
+    # 最新发布时间
+    latest_published = get_latest_published()
+
+    conn.close()
+
     return jsonify({
-        'total_news': get_news_count(),
-        'latest_published': get_latest_published(),
+        'total_users': total_users,
+        'total_news': total_news,
+        'push_rules_count': push_rules_count,
+        'today_views': today_views,
+        'latest_published': latest_published,
         'settings': get_all_settings()
     })
 
@@ -2886,6 +2919,165 @@ def api_get_push_logs():
     return jsonify(logs)
 
 
+# ==================== 定时任务管理 API ====================
+
+# 全局定时任务管理器实例
+_scheduler_manager = None
+
+def get_scheduler_manager():
+    """获取定时任务管理器（单例）"""
+    global _scheduler_manager
+    if _scheduler_manager is None:
+        try:
+            from task_manager import TaskManager
+            _scheduler_manager = TaskManager()
+            # 自动启动定时任务
+            _scheduler_manager.start_tasks()
+            logger.info("定时任务已自动启动")
+        except Exception as e:
+            logger.error(f"初始化定时任务管理器失败：{e}")
+    return _scheduler_manager
+
+
+@app.route('/api/scheduler/status', methods=['GET'])
+def api_get_scheduler_status():
+    """获取定时任务状态"""
+    try:
+        manager = get_scheduler_manager()
+        if manager:
+            status = manager.get_status()
+            return jsonify({
+                'success': True,
+                'status': status
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '定时任务管理器未初始化'
+            }), 500
+    except Exception as e:
+        logger.error(f"获取定时任务状态失败：{e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/scheduler/start', methods=['POST'])
+def api_start_scheduler():
+    """启动定时任务"""
+    try:
+        manager = get_scheduler_manager()
+        if manager:
+            result = manager.start_tasks()
+            return jsonify({
+                'success': result,
+                'message': '定时任务已启动' if result else '定时任务已在运行中'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '定时任务管理器未初始化'
+            }), 500
+    except Exception as e:
+        logger.error(f"启动定时任务失败：{e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/scheduler/stop', methods=['POST'])
+def api_stop_scheduler():
+    """停止定时任务"""
+    try:
+        manager = get_scheduler_manager()
+        if manager:
+            result = manager.stop_tasks()
+            return jsonify({
+                'success': result,
+                'message': '定时任务已停止' if result else '定时任务未在运行'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '定时任务管理器未初始化'
+            }), 500
+    except Exception as e:
+        logger.error(f"停止定时任务失败：{e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/scheduler/history', methods=['GET'])
+def api_get_scheduler_history():
+    """获取定时任务历史记录"""
+    try:
+        manager = get_scheduler_manager()
+        limit = request.args.get('limit', 20, type=int)
+        if manager:
+            history = manager.get_history(limit)
+            return jsonify({
+                'success': True,
+                'history': history
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '定时任务管理器未初始化'
+            }), 500
+    except Exception as e:
+        logger.error(f"获取定时任务历史失败：{e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/crawlers/run', methods=['POST'])
+def api_run_crawlers():
+    """立即运行爬虫"""
+    try:
+        import subprocess
+        import sys
+
+        # 异步运行爬虫脚本
+        def run_crawler_task():
+            try:
+                result = subprocess.run(
+                    [sys.executable, 'run_crawlers.py'],
+                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 分钟超时
+                )
+                logger.info(f"爬虫执行完成， stdout: {result.stdout}")
+                if result.stderr:
+                    logger.error(f"爬虫执行 stderr: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                logger.error("爬虫执行超时")
+            except Exception as e:
+                logger.error(f"爬虫执行失败：{e}")
+
+        # 在新线程中运行，避免阻塞 API 响应
+        thread = threading.Thread(target=run_crawler_task, daemon=True)
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'status': 'running',
+            'message': '爬虫已在后台启动，约 1-3 分钟内完成'
+        })
+    except Exception as e:
+        logger.error(f"启动爬虫失败：{e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     print('=' * 60)
     print('📊 舆情监控系统启动')
@@ -2898,4 +3090,8 @@ if __name__ == '__main__':
     print('提示：爬虫数据会通过定时任务每 10 分钟自动更新')
     print('      可通过 POST /api/refresh 手动刷新数据')
     print('=' * 60)
+
+    # 初始化定时任务管理器（自动启动）
+    get_scheduler_manager()
+
     app.run(host='0.0.0.0', port=5000, debug=False)

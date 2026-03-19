@@ -2,8 +2,10 @@ import sqlite3
 import feedparser
 import requests
 from bs4 import BeautifulSoup
+import os
 
-DB_PATH = "database.sqlite3"
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'database.sqlite3'))
 
 # 创建数据库表
 connection = sqlite3.connect(DB_PATH)
@@ -64,6 +66,18 @@ if 'category' not in columns:
 if 'views' not in columns:
     cursor.execute("ALTER TABLE Articles ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
     print("已为 Articles 表添加 views 字段")
+if 'source_name' not in columns:
+    cursor.execute("ALTER TABLE Articles ADD COLUMN source_name TEXT DEFAULT 'Unknown'")
+    print("已为 Articles 表添加 source_name 字段")
+if 'sentiment' not in columns:
+    cursor.execute("ALTER TABLE Articles ADD COLUMN sentiment TEXT DEFAULT 'neutral'")
+    print("已为 Articles 表添加 sentiment 字段")
+if 'hot_score' not in columns:
+    cursor.execute("ALTER TABLE Articles ADD COLUMN hot_score INTEGER DEFAULT 50")
+    print("已为 Articles 表添加 hot_score 字段")
+if 'summary' not in columns:
+    cursor.execute("ALTER TABLE Articles ADD COLUMN summary TEXT DEFAULT ''")
+    print("已为 Articles 表添加 summary 字段")
 
 connection.commit()
 connection.close()

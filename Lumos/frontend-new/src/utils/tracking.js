@@ -26,8 +26,11 @@ export const ACTION_TYPES = {
   VIEW: 'view',        // 浏览
 };
 
-// 配置常量
+/**
+ * 配置常量
+ */
 const CONFIG = {
+  API_BASE_URL: 'http://localhost:5000/api',  // 后端 API 地址
   FLUSH_INTERVAL: 3000,        // 3 秒批量上报一次
   MAX_QUEUE_SIZE: 50,          // 最大缓存条数
   BATCH_SIZE: 20,              // 每批最多 20 条
@@ -146,7 +149,7 @@ const flushQueue = async () => {
 
     // 优先使用 sendBeacon（异步，不阻塞）
     if (navigator.sendBeacon) {
-      const success = navigator.sendBeacon('/api/user/behavior/batch', blob);
+      const success = navigator.sendBeacon(`${CONFIG.API_BASE_URL}/user/behavior/batch`, blob);
       if (success) {
         console.log(`[Tracking] Batch sent (${batch.length} behaviors) via sendBeacon`);
         retryCount = 0; // 重置重试计数
@@ -157,7 +160,7 @@ const flushQueue = async () => {
       }
     } else {
       // 方式 2: 降级使用 fetch（异步）
-      fetch('/api/user/behavior/batch', {
+      fetch(`${CONFIG.API_BASE_URL}/user/behavior/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(batch),
@@ -349,7 +352,7 @@ export const initTracking = () => {
     stopTrackingView();
     // 同步上报（不等待）
     if (behaviorQueue.length > 0) {
-      navigator.sendBeacon?.('/api/user/behavior/batch', JSON.stringify(behaviorQueue));
+      navigator.sendBeacon?.(`${CONFIG.API_BASE_URL}/user/behavior/batch`, JSON.stringify(behaviorQueue));
     }
   });
 

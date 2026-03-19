@@ -9,9 +9,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snowflake_id import generate_uuid
 
-# 获取当前文件的目录，并构建相对路径
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(CURRENT_DIR, "..", "database.sqlite3")
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), '..', 'database.sqlite3'))
 
 # 验证码存储（生产环境应该用 Redis）
 # 格式：{phone: {"code": "123456", "expire": timestamp}}

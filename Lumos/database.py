@@ -466,18 +466,20 @@ def get_news(limit=300, offset=0):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # 优化排序逻辑：优先按时间排序，确保最新数据在前
+    # priority 仅作为次要排序条件（同时间情况下优先展示 crawler/domestic）
     cursor.execute('''
         SELECT news_id, title, original_title, source, published, sentiment,
                hot_score, link, lang, content, priority, created_at
         FROM news
         ORDER BY
+            COALESCE(published, created_at) DESC,
             CASE priority
                 WHEN 'crawler' THEN 0
                 WHEN 'domestic' THEN 1
                 WHEN 'overseas' THEN 2
                 ELSE 3
-            END,
-            COALESCE(published, created_at) DESC
+            END
         LIMIT ? OFFSET ?
     ''', (limit, offset))
 
@@ -552,10 +554,19 @@ def save_news(news_list):
             # 获取 URL（兼容不同字段名）
             link = news.get('link') or news.get('url', '')
 
+            # 使用本地时间而不是 UTC 时间
+            from datetime import datetime
+            local_created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             # 首先检查 link 是否已存在（最快）
             if link:
                 cursor.execute('SELECT COUNT(*) FROM news WHERE link = ?', (link,))
                 if cursor.fetchone()[0] > 0:
+                    # 已存在，更新 created_at 时间为当前时间（确保热榜类新闻显示最新抓取时间）
+                    cursor.execute('''
+                        UPDATE news SET created_at = ?, hot_score = ?, content = ?
+                        WHERE link = ?
+                    ''', (local_created_at, news.get('hot_score'), news.get('content', ''), link))
                     duplicate_count += 1
                     continue
 
@@ -568,14 +579,15 @@ def save_news(news_list):
                     (title, source)
                 )
                 if cursor.fetchone()[0] > 0:
+                    # 已存在，更新 created_at 时间为当前时间
+                    cursor.execute('''
+                        UPDATE news SET created_at = ?, hot_score = ?, content = ?
+                        WHERE title = ? AND source = ?
+                    ''', (local_created_at, news.get('hot_score'), news.get('content', ''), title, source))
                     duplicate_count += 1
                     continue
 
             # 通过所有去重检查，插入新闻
-            # 使用本地时间而不是 UTC 时间
-            from datetime import datetime
-            local_created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
             cursor.execute('''
                 INSERT OR IGNORE INTO news
                 (news_id, title, original_title, source, published, sentiment, hot_score, link, lang, content, priority, created_at)
@@ -613,6 +625,9 @@ def save_news(news_list):
         print(f"  📊 去重统计：新增 {saved_count} 条，重复 {duplicate_count} 条，共 {total} 条")
 
     return saved_count
+
+
+# 数据直接保存到 Articles 表，不再需要同步逻辑
 
 
 # 导入原始数据库函数以保持兼容性
@@ -1065,7 +1080,7 @@ init_db = init_db_with_user_interests
 
 def save_news(news_list):
     """
-    批量保存新闻（严格去重）
+    批量保存新闻到 Articles 表（严格去重）
     去重策略：
     1. 频道去重：source 字段自动去重（相同 source 的内容会合并）
     2. 内容去重：link 唯一约束 + title+source 复合检查
@@ -1080,69 +1095,58 @@ def save_news(news_list):
 
     for news in news_list:
         try:
-            # 生成唯一 news_id（如果爬虫没有提供）
-            news_id = news.get('id')
-            if not news_id:
-                # 使用 link 的哈希值作为 ID（确保唯一性）
-                import hashlib
-                link = news.get('link', '') or news.get('url', '')
-                title = news.get('title', '')
-                source = news.get('source', '')
-                # 使用 title+source+link 生成唯一 ID
-                unique_key = f"{title}:{source}:{link}"
-                news_id = int(hashlib.md5(unique_key.encode('utf-8')).hexdigest()[:12], 16)
-
             # 获取 URL（兼容不同字段名）
             link = news.get('link') or news.get('url', '')
+            title = news.get('title', '')
+            source = news.get('source', '')
 
             # 首先检查 link 是否已存在（最快）
             if link:
-                cursor.execute('SELECT COUNT(*) FROM news WHERE link = ?', (link,))
+                cursor.execute('SELECT COUNT(*) FROM Articles WHERE link = ?', (link,))
                 if cursor.fetchone()[0] > 0:
                     duplicate_count += 1
                     continue
 
             # 如果 link 为空或不存在，检查 title+source 组合
-            title = news.get('title', '')
-            source = news.get('source', '')
             if title and source:
                 cursor.execute(
-                    'SELECT COUNT(*) FROM news WHERE title = ? AND source = ?',
+                    'SELECT COUNT(*) FROM Articles WHERE title = ? AND source_name = ?',
                     (title, source)
                 )
                 if cursor.fetchone()[0] > 0:
                     duplicate_count += 1
                     continue
 
-            # 通过所有去重检查，插入新闻
-            # 使用本地时间而不是 UTC 时间
-            from datetime import datetime
-            local_created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # 通过所有去重检查，获取或创建 source_id
+            cursor.execute("SELECT id FROM NewsSources WHERE name = ?", (source,))
+            source_row = cursor.fetchone()
+            if source_row:
+                source_id = source_row[0]
+            else:
+                cursor.execute("INSERT INTO NewsSources (name, url, type) VALUES (?, ?, ?)",
+                              (source, link or '', 'API'))
+                source_id = cursor.lastrowid
 
+            # 插入新闻到 Articles 表
             cursor.execute('''
-                INSERT OR IGNORE INTO news
-                (news_id, title, original_title, source, published, sentiment, hot_score, link, lang, content, priority, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Articles (title, link, keywords, source_id, published_at, category, views, source_name, sentiment, hot_score, summary)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                news_id,
-                news.get('title'),
-                news.get('original_title'),
-                source,
-                news.get('published'),
-                news.get('sentiment'),
-                news.get('hot_score'),
+                title,
                 link,
-                news.get('lang'),
-                news.get('content', ''),
-                news.get('priority', 'overseas'),
-                local_created_at
+                '热点',
+                source_id,
+                news.get('published') or datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                '热点',
+                0,
+                source,
+                news.get('sentiment', 'neutral'),
+                news.get('hot_score', 50),
+                title[:200] if title else ''
             ))
 
-            if cursor.rowcount > 0:
-                saved_count += 1
-                print(f"  ✓ 新增新闻：{title[:30]}...")
-            else:
-                duplicate_count += 1
+            saved_count += 1
+            print(f"  ✓ 新增新闻：{title[:30]}...")
 
         except Exception as e:
             print(f"保存新闻失败：{e}")
@@ -1170,18 +1174,20 @@ def get_news(limit=300, offset=0):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # 优化排序逻辑：优先按时间排序，确保最新数据在前
+    # priority 仅作为次要排序条件（同时间情况下优先展示 crawler/domestic）
     cursor.execute('''
         SELECT news_id, title, original_title, source, published, sentiment,
                hot_score, link, lang, content, priority, created_at
         FROM news
         ORDER BY
+            COALESCE(published, created_at) DESC,
             CASE priority
                 WHEN 'crawler' THEN 0
                 WHEN 'domestic' THEN 1
                 WHEN 'overseas' THEN 2
                 ELSE 3
-            END,
-            COALESCE(published, created_at) DESC
+            END
         LIMIT ? OFFSET ?
     ''', (limit, offset))
 

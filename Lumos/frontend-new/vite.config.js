@@ -17,5 +17,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        admin: 'admin.html',
+        behavior: 'behavior.html',
+        interestGraph: 'interest-graph.html',
+      },
+    },
   },
 })

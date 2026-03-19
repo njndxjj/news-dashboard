@@ -237,156 +237,6 @@
             opacity: 0.5;
         }
 
-        /* 登录界面样式 */
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .login-modal {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-radius: 16px;
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .login-modal h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 24px;
-            background: linear-gradient(90deg, #4CAF50, #2196F3);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .form-group label {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        .form-group input {
-            padding: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-            font-size: 14px;
-            width: 100%;
-        }
-
-        .form-group input::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .login-btn {
-            padding: 14px;
-            background: linear-gradient(90deg, #4CAF50, #2196F3);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
-        }
-
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
-        }
-
-        .login-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .error-message {
-            background: rgba(244, 67, 54, 0.1);
-            border: 1px solid rgba(244, 67, 54, 0.3);
-            color: #F44336;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            text-align: center;
-            display: none;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 16px;
-            background: rgba(76, 175, 80, 0.1);
-            border-radius: 8px;
-            border: 1px solid rgba(76, 175, 80, 0.2);
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: linear-gradient(90deg, #4CAF50, #2196F3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .user-details {
-            flex: 1;
-        }
-
-        .user-name {
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .user-role {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .logout-btn {
-            padding: 6px 12px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            color: #fff;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
         @media (max-width: 1024px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -395,53 +245,16 @@
     </style>
 </head>
 <body>
-    <!-- 登录弹窗 -->
-    <div id="loginOverlay" class="login-overlay" style="display: none;">
-        <div class="login-modal">
-            <h2>🔐 管理员登录</h2>
-            <form class="login-form" id="loginForm">
-                <div class="form-group">
-                    <label for="username">用户名</label>
-                    <input type="text" id="username" name="username" placeholder="请输入用户名" required autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label for="password">密码</label>
-                    <input type="password" id="password" name="password" placeholder="请输入密码" required autocomplete="current-password">
-                </div>
-                <div class="form-group" id="captchaGroup" style="display: none;">
-                    <label for="captcha">验证码（4 位数字）</label>
-                    <input type="text" id="captcha" name="captcha" placeholder="请输入验证码" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
-                    <small style="color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 4px;">超管用户需要验证码，默认：8888</small>
-                </div>
-                <div class="error-message" id="loginError"></div>
-                <button type="submit" class="login-btn" id="loginBtn">登录</button>
-            </form>
-        </div>
-    </div>
-
     <div class="container">
         <header>
             <h1>🧠 用户兴趣图谱</h1>
             <div class="controls">
-                <!-- 用户信息显示 -->
-                <div id="userInfo" style="display: none;">
-                    <div class="user-info">
-                        <div class="user-avatar" id="userAvatar">A</div>
-                        <div class="user-details">
-                            <div class="user-name" id="userName">Admin</div>
-                            <div class="user-role">管理员</div>
-                        </div>
-                        <button class="logout-btn" onclick="logout()">退出</button>
-                    </div>
-                </div>
-                <!-- 登录按钮 -->
-                <button id="loginBtnHeader" class="btn-primary" onclick="showLogin()" style="display: none;">🔐 登录</button>
-                <div class="user-selector" id="userSelector" style="display: none;">
+                <div class="user-selector">
                     <input type="text" id="userIdInput" placeholder="输入用户 ID" value="default">
                     <button class="btn-primary" onclick="loadInterestGraph()">加载图谱</button>
                 </div>
-                <button class="btn-secondary" id="refreshBtn" onclick="refreshData()" style="display: none;">🔄 刷新</button>
-                <button class="btn-secondary" id="decayBtn" onclick="applyDecay()" style="display: none;">⏳ 应用衰减</button>
+                <button class="btn-secondary" id="refreshBtn" onclick="refreshData()">🔄 刷新</button>
+                <button class="btn-secondary" id="decayBtn" onclick="applyDecay()">⏳ 应用衰减</button>
             </div>
         </header>
 
@@ -804,7 +617,7 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', () => {
             initChart();
-            checkAdminStatus();
+            loadInterestGraph(); // 直接加载兴趣图谱
 
             // 支持回车键加载
             document.getElementById('userIdInput').addEventListener('keypress', (e) => {
@@ -813,125 +626,6 @@
                 }
             });
         });
-
-        // ==================== 管理员登录逻辑 ====================
-
-        let currentUser = null;
-
-        // 检查管理员状态
-        async function checkAdminStatus() {
-            try {
-                const response = await fetch('/api/admin/check');
-                const data = await response.json();
-
-                if (data.is_admin) {
-                    currentUser = data;
-                    showLoggedInUI(data);
-                } else {
-                    showLogin();
-                }
-            } catch (error) {
-                console.error('检查登录状态失败:', error);
-                showLogin();
-            }
-        }
-
-        // 显示登录界面
-        function showLogin() {
-            document.getElementById('loginOverlay').style.display = 'flex';
-            document.getElementById('userInfo').style.display = 'none';
-            document.getElementById('loginBtnHeader').style.display = 'none';
-            document.getElementById('userSelector').style.display = 'none';
-            document.getElementById('refreshBtn').style.display = 'none';
-            document.getElementById('decayBtn').style.display = 'none';
-        }
-
-        // 隐藏登录界面
-        function hideLogin() {
-            document.getElementById('loginOverlay').style.display = 'none';
-        }
-
-        // 显示已登录 UI
-        function showLoggedInUI(user) {
-            hideLogin();
-            document.getElementById('userInfo').style.display = 'flex';
-            document.getElementById('userSelector').style.display = 'flex';
-            document.getElementById('refreshBtn').style.display = 'inline-block';
-            document.getElementById('decayBtn').style.display = 'inline-block';
-
-            document.getElementById('userName').textContent = user.name || user.username;
-            document.getElementById('userAvatar').textContent = (user.name || user.username).charAt(0).toUpperCase();
-
-            // 加载兴趣图谱
-            loadInterestGraph();
-        }
-
-        // 登录表单提交
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const captcha = document.getElementById('captcha').value;
-            const loginBtn = document.getElementById('loginBtn');
-            const errorDiv = document.getElementById('loginError');
-
-            loginBtn.disabled = true;
-            loginBtn.textContent = '登录中...';
-            errorDiv.style.display = 'none';
-
-            try {
-                const requestBody = { username, password };
-                if (captcha) {
-                    requestBody.captcha = captcha;
-                }
-
-                const response = await fetch('/api/admin/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    currentUser = data;
-                    showLoggedInUI(data);
-                    // 清空表单
-                    document.getElementById('username').value = '';
-                    document.getElementById('password').value = '';
-                    document.getElementById('captcha').value = '';
-                } else if (response.status === 403 && data.captcha_required) {
-                    // 需要验证码，显示验证码输入框
-                    document.getElementById('captchaGroup').style.display = 'flex';
-                    document.getElementById('captcha').focus();
-                    errorDiv.textContent = data.error || '需要验证码';
-                    errorDiv.style.display = 'block';
-                } else {
-                    errorDiv.textContent = data.error || '登录失败';
-                    errorDiv.style.display = 'block';
-                }
-            } catch (error) {
-                errorDiv.textContent = '登录失败：' + error.message;
-                errorDiv.style.display = 'block';
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登录';
-            }
-        });
-
-        // 登出
-        async function logout() {
-            try {
-                await fetch('/api/admin/logout', { method: 'POST' });
-                currentUser = null;
-                showLogin();
-            } catch (error) {
-                console.error('登出失败:', error);
-            }
-        }
     </script>
 </body>
 </html>

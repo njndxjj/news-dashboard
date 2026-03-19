@@ -4,7 +4,15 @@ const API_BASE_URL = 'http://localhost:5000';
 
 export const apiRequest = async (method, endpoint, data) => {
   try {
-    const response = await axios({ method, url: `${API_BASE_URL}${endpoint}`, data });
+    const config = {
+      method,
+      url: `${API_BASE_URL}${endpoint}`,
+      data,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+    const response = await axios(config);
     return response.data;
   } catch (error) {
     console.error(`Error during API request to ${endpoint}:`, error);

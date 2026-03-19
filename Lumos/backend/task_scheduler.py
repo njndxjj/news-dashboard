@@ -3,10 +3,12 @@ import sqlite3
 import feedparser
 import requests
 from bs4 import BeautifulSoup
+import os
 
 # 配置 Celery 应用
 app = Celery('tasks', broker='redis://localhost:6379/0')
-DB_PATH = "database.sqlite3"
+# 优先使用环境变量 DB_PATH，否则使用项目根目录下的 database.sqlite3
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), '..', 'database.sqlite3'))
 
 @app.task
 def update_rss_data(rss_url):
