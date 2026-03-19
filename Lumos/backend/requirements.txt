@@ -13,3 +13,4 @@ playwright
 httpx
 schedule
 psutil
+redis

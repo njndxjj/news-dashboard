@@ -442,4 +442,98 @@ export const triggerCollection = async () => {
   return apiClient.post('/collect');
 };
 
+// ==================== 管理后台 - RSS 源管理 ====================
+
+/**
+ * 获取所有 RSS 源
+ */
+export const getRssFeeds = async () => {
+  return apiClient.get('/admin/rss-feeds');
+};
+
+/**
+ * 创建 RSS 源
+ */
+export const createRssFeed = async (data) => {
+  return apiClient.post('/admin/rss-feeds', data);
+};
+
+/**
+ * 更新 RSS 源
+ */
+export const updateRssFeed = async (feedId, data) => {
+  return apiClient.put(`/admin/rss-feeds/${feedId}`, data);
+};
+
+/**
+ * 删除 RSS 源
+ */
+export const deleteRssFeed = async (feedId) => {
+  return apiClient.delete(`/admin/rss-feeds/${feedId}`);
+};
+
+/**
+ * 测试 RSS 源
+ */
+export const testRssFeed = async (feedId) => {
+  return apiClient.get(`/admin/rss-feeds/${feedId}/test`);
+};
+
+/**
+ * 获取爬虫状态
+ */
+export const getCrawlersStatus = async () => {
+  return apiClient.get('/admin/crawlers/status');
+};
+
+/**
+ * 手动运行爬虫
+ */
+export const runCrawlers = async () => {
+  return apiClient.post('/admin/crawlers/run');
+};
+
+// ==================== 付费转化 - 深度报告 ====================
+
+/**
+ * 获取深度报告列表
+ */
+export const getDeepReports = async (industry) => {
+  const params = industry ? { industry } : {};
+  return apiClient.get('/monetization/reports', { params });
+};
+
+/**
+ * 获取深度报告详情
+ */
+export const getDeepReport = async (reportId) => {
+  return apiClient.get(`/monetization/reports/${reportId}`);
+};
+
+/**
+ * 消耗报告额度
+ */
+export const consumeReportQuota = async () => {
+  return apiClient.post('/monetization/consume-report');
+};
+
+/**
+ * 获取用户订阅状态
+ */
+export const getUserSubscription = async () => {
+  return apiClient.get('/monetization/subscription');
+};
+
+// ==================== 付费转化 - 课程推荐 ====================
+
+/**
+ * 获取课程列表
+ */
+export const getCourses = async (industry, limit = 20) => {
+  const params = {};
+  if (industry) params.industry = industry;
+  if (limit) params.limit = limit;
+  return apiClient.get('/monetization/courses', { params });
+};
+
 export default apiClient;

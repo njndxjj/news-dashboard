@@ -13,6 +13,7 @@ import {
   Badge,
   Typography,
   Divider,
+  Skeleton,
 } from 'antd';
 import {
   SyncOutlined,
@@ -22,7 +23,7 @@ import {
   LinkOutlined,
 } from '@ant-design/icons';
 import { fetchNews, searchNews, refreshNews, recordUserClick } from '../services/api.js';
-import { trackEvent, trackPageView, trackSearch } from '../utils/tracking.js';
+import { trackClick, startTrackingView, stopTrackingView, trackSearch } from '../utils/tracking.js';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -204,9 +205,17 @@ function NewsList() {
 
       {/* 新闻列表 */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <Spin size="large" tip="加载中..." />
-        </div>
+        <List
+          grid={{ gutter: 16, column: 1 }}
+          dataSource={Array(5)}
+          renderItem={() => (
+            <List.Item>
+              <Card>
+                <Skeleton avatar paragraph={{ rows: 3 }} active />
+              </Card>
+            </List.Item>
+          )}
+        />
       ) : newsList.length === 0 ? (
         <Empty description="暂无新闻数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
@@ -220,7 +229,17 @@ function NewsList() {
                 className="news-card"
                 onClick={() => {
                   handleNewsClick(news);
+                  // 开始追踪浏览行为
+                  startTrackingView(news.id || news.link, news.title, news.source);
                   if (news.link) window.open(news.link, '_blank');
+                }}
+                onMouseEnter={() => {
+                  // 鼠标悬停时也开始追踪
+                  startTrackingView(news.id || news.link, news.title, news.source);
+                }}
+                onMouseLeave={() => {
+                  // 鼠标离开时停止追踪
+                  stopTrackingView();
                 }}
                 title={
                   <Space direction="vertical" style={{ width: '100%' }} size={8}>

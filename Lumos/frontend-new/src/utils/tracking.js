@@ -269,16 +269,55 @@ export const trackPageView = (pageName, extraData = {}) => {
 };
 
 /**
- * 追踪浏览行为（带停留时长统计）
+ * 追踪浏览行为（带停留时长和滚动深度统计）
  */
 let viewStartTime = null;
 let viewTimer = null;
+let maxScrollDepth = 0;
+let scrollCheckTimer = null;
+
+/**
+ * 计算当前滚动深度百分比
+ */
+const calculateScrollDepth = () => {
+  const scrollTop = window.scrollY || window.pageYOffset;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  return docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+};
+
+/**
+ * 监听滚动深度
+ */
+const startScrollTracking = () => {
+  const updateScrollDepth = () => {
+    const depth = calculateScrollDepth();
+    if (depth > maxScrollDepth) {
+      maxScrollDepth = depth;
+    }
+
+    // 继续监听
+    scrollCheckTimer = setTimeout(updateScrollDepth, 1000);
+  };
+
+  updateScrollDepth();
+};
+
+export const stopScrollTracking = () => {
+  if (scrollCheckTimer) {
+    clearTimeout(scrollCheckTimer);
+    scrollCheckTimer = null;
+  }
+};
 
 export const startTrackingView = (newsId, title, source) => {
   // 保存当前浏览的新闻信息
   localStorage.setItem('current_news', JSON.stringify({ newsId, title, source }));
 
   viewStartTime = Date.now();
+  maxScrollDepth = 0;
+
+  // 开始滚动追踪
+  startScrollTracking();
 
   // 设置停留时长上报（30 秒后开始统计）
   if (viewTimer) {
@@ -288,7 +327,7 @@ export const startTrackingView = (newsId, title, source) => {
   viewTimer = setTimeout(() => {
     const duration = Math.floor((Date.now() - viewStartTime) / 1000);
     if (duration >= 5) { // 至少停留 5 秒才算有效浏览
-      trackBehavior(ACTION_TYPES.VIEW, newsId, title, source, {}, duration);
+      trackBehavior(ACTION_TYPES.VIEW, newsId, title, source, { scroll_depth: maxScrollDepth }, duration);
     }
   }, 5000); // 5 秒后开始追踪
 };
@@ -298,6 +337,8 @@ export const stopTrackingView = () => {
     clearTimeout(viewTimer);
     viewTimer = null;
   }
+
+  stopScrollTracking();
 
   if (viewStartTime) {
     const duration = Math.floor((Date.now() - viewStartTime) / 1000);
@@ -309,12 +350,13 @@ export const stopTrackingView = () => {
         currentNews.newsId,
         currentNews.title,
         currentNews.source,
-        {},
+        { scroll_depth: maxScrollDepth },
         duration
       );
     }
 
     viewStartTime = null;
+    maxScrollDepth = 0;
   }
 };
 
@@ -380,5 +422,6 @@ export default {
   startTrackingView,
   stopTrackingView,
   switchTrackingView,
+  calculateScrollDepth,
   ACTION_TYPES,
 };

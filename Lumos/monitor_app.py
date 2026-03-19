@@ -287,6 +287,9 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 from user_module import user_bp
+from analytics import analytics_bp
+from admin import admin_bp
+from monetization import monetization_bp
 
 # 导入爬虫模块
 import asyncio
@@ -297,6 +300,9 @@ init_db()
 
 # 注册用户模块蓝图
 app.register_blueprint(user_bp)
+app.register_blueprint(analytics_bp, url_prefix='/api')
+app.register_blueprint(admin_bp, url_prefix='/api')
+app.register_blueprint(monetization_bp, url_prefix='/api')
 
 # 如果环境变量配置了飞书 Webhook，则更新到数据库
 if FEISHU_WEBHOOK:

@@ -1,0 +1,28 @@
+[Unit]
+Description=Lumos Backend Service
+Documentation=https://gitee.com/your-repo/Lumos
+After=network.target neo4j.service redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/Lumos
+Environment="PATH=/usr/bin:/usr/local/bin"
+EnvironmentFile=/path/to/Lumos/.env
+ExecStart=/usr/bin/python3 monitor_app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lumos-backend
+
+# 安全配置
+NoNewPrivileges=true
+PrivateTmp=true
+
+# 性能优化
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+[Unit]
+Description=Lumos Scheduler Service
+Documentation=https://gitee.com/your-repo/Lumos
+After=network.target lumos-backend.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/Lumos
+Environment="PATH=/usr/bin:/usr/local/bin"
+EnvironmentFile=/path/to/Lumos/.env
+ExecStart=/usr/bin/python3 scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lumos-scheduler
+
+# 安全配置
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
