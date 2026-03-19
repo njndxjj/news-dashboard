@@ -34,15 +34,15 @@ module.exports = {
     {
       name: 'lumos-frontend',
       cwd: './frontend-new',
-      script: 'npm',
-      args: 'start',
+      script: 'server.js',
       instances: 1,
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
+      max_memory_restart: '512M',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: '3000',
+        BACKEND_URL: 'http://localhost:5000'
       },
       error_file: './logs/frontend-error.log',
       out_file: './logs/frontend-out.log',
