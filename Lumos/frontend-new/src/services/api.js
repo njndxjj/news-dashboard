@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// 生产环境：直接请求后端 5000 端口
-// 开发环境可以通过 webpack devServer 代理配置使用相对路径
-const API_BASE_URL = 'http://localhost:5000/api';
+// 使用相对路径，通过 Nginx 代理请求后端 API
+// 在生产环境中，Nginx 会将 /api 请求代理到后端服务
+const API_BASE_URL = '/api';
 
 // 创建 axios 实例
 const apiClient = axios.create({

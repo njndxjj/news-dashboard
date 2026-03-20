@@ -332,6 +332,43 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
+## 🚀 当前系统状态
+
+### 服务运行情况
+所有服务当前正在运行中：
+- ✅ **后端服务**：端口 5000 ([monitor_app.py](file:///Users/bs-00008898/lobsterai/project/monitor_app.py))
+- ✅ **前端服务**：端口 3000 ([Lumos/frontend-new/server.js](file:///Users/bs-00008898/lobsterai/project/Lumos/frontend-new/server.js))
+- ✅ **定时任务**：每10分钟执行一次 ([Lumos/scheduler.py](file:///Users/bs-00008898/lobsterai/project/Lumos/scheduler.py))
+- ✅ **反向代理**：端口 8080 ([simple_proxy.js](file:///Users/bs-00008898/lobsterai/project/simple_proxy.js))
+
+### 访问方式
+- **用户端访问**：http://localhost:8080 或 http://172.16.174.28:8080
+- **管理后台**：http://localhost:8080/admin
+- **API接口**：http://localhost:8080/api/*
+- **API健康检查**：http://localhost:8080/api/health
+
+### 系统特性
+✅ **双页面设计**：用户端和管理后台分离
+✅ **定时任务**：每10分钟自动数据更新
+✅ **跨域解决**：通过反向代理解决CORS问题
+✅ **代理功能**：支持本地浏览器能力调用
+✅ **统一访问**：通过单一端口提供所有服务
+
+### Nginx 替代方案
+如需使用Nginx作为反向代理（替代Node.js代理），请参考：
+- [lumos_nginx_config.conf](file:///Users/bs-00008898/lobsterai/project/lumos_nginx_config.conf) - Nginx配置示例
+- [nginx_setup_guide.md](file:///Users/bs-00008898/lobsterai/project/nginx_setup_guide.md) - 安装指南
+- [install_nginx_config.sh](file:///Users/bs-00008898/lobsterai/project/install_nginx_config.sh) - 安装脚本
+
+### 服务管理
+使用管理脚本控制所有服务：
+```bash
+chmod +x lumos_service_manager.sh
+./lumos_service_manager.sh {start|stop|restart|status}
+```
+
+---
+
 ## 👥 团队
 
 **Lumos Team** © 2026
@@ -343,8 +380,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 <div align="center">
 
-**让 Lumos 成为你商业决策的第一道光** 🌟
+**让 Lumos 成为你商业决策的第一道光** ��
 
-[阅读文档](Lumos/INDEX.md) · [快速开始](Lumos/QUICKSTART.md) · [API 参考](Lumos/API.md)
+[阅读文档](Lumos/INDEX.md) · [快速开始](Lumos/QUICKSTART.md) · [API 参考](Lumos/API.md) · [系统概览](LUMOS_SYSTEM_OVERVIEW.md)
 
 </div>

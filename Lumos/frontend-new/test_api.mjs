@@ -24,7 +24,7 @@ page.on('response', response => {
   }
 });
 
-await page.goto('http://localhost:5000/admin', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:3000/admin', { waitUntil: 'networkidle' });
 await page.waitForTimeout(500);
 
 // 填写并点击登录

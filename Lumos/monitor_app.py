@@ -277,6 +277,12 @@ from database import (
     upsert_interest_graph, get_user_interest_graph, get_user_interest_network,
     apply_interest_decay, get_related_interests
 )
+
+# 添加项目根目录到Python路径，以便导入feishu_push
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 项目根目录
+
 from feishu_push import (
     send_feishu_message, format_single_news_card, format_breaking_news_batch,
     format_daily_summary, check_and_push_notifications, send_test_push,

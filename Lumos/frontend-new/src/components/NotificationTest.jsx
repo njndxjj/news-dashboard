@@ -32,7 +32,7 @@ function NotificationTest() {
 
   const handleGeneralNotification = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/api/notify', {
+      const response = await axios.post('/api/notify', {
         message: 'General notification test'
       });
       if (response.data) {

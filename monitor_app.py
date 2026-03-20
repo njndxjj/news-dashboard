@@ -2261,7 +2261,9 @@ if __name__ == '__main__':
     print('=' * 60)
     print('📊 舆情监控系统启动')
     print('=' * 60)
-    print(f'服务地址：http://localhost:5000')
+    host = os.getenv('HOST', '0.0.0.0')  # 服务器环境监听所有接口
+    port = int(os.getenv('PORT', 5000))   # 允许通过环境变量设置端口
+    print(f'服务地址：http://{host}:{port}')
     print(f'数据库路径：{DB_PATH}')
     print(f'爬虫平台：{len(CRAWLER_IMPLEMENTED)} 个')
     print(f'RSS 源：国内 {len(RSS_FEEDS_DOMESTIC)} 个，国外 {len(RSS_FEEDS_OVERSEAS)} 个')
@@ -2269,4 +2271,4 @@ if __name__ == '__main__':
     print('提示：爬虫数据会通过定时任务每 10 分钟自动更新')
     print('      可通过 POST /api/refresh 手动刷新数据')
     print('=' * 60)
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host=host, port=port, debug=False)

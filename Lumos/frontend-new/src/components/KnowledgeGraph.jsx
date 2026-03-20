@@ -6,7 +6,7 @@ function KnowledgeGraph() {
   const [graphElements, setGraphElements] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/graph')
+    axios.get('/api/graph')
       .then(response => {
         // 处理后端返回的数据 - 适配不同的可能数据格式
         let nodesData = [];

@@ -30,7 +30,7 @@ export const ACTION_TYPES = {
  * 配置常量
  */
 const CONFIG = {
-  API_BASE_URL: 'http://localhost:5000/api',  // 后端 API 地址
+  API_BASE_URL: '/api',  // 使用相对路径，通过 Nginx 代理
   FLUSH_INTERVAL: 3000,        // 3 秒批量上报一次
   MAX_QUEUE_SIZE: 50,          // 最大缓存条数
   BATCH_SIZE: 20,              // 每批最多 20 条

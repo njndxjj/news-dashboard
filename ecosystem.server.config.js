@@ -10,7 +10,10 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        FLASK_ENV: 'production'
+        FLASK_ENV: 'production',
+        // 服务器环境配置 - 监听所有网络接口
+        HOST: '0.0.0.0',
+        PORT: '5000'
       },
       error_file: './logs/backend-error.log',
       out_file: './logs/backend-out.log',
@@ -25,7 +28,9 @@ module.exports = {
       watch: false,
       max_memory_restart: '500M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        // 服务器环境配置
+        PYTHONPATH: './'
       },
       error_file: './logs/scheduler-error.log',
       out_file: './logs/scheduler-out.log',
@@ -33,7 +38,7 @@ module.exports = {
     },
     {
       name: 'lumos-frontend',
-      cwd: './frontend-new',
+      cwd: './Lumos/frontend-new',
       script: 'server.js',
       instances: 1,
       autorestart: true,
@@ -42,9 +47,10 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '3000',
-        // When using Nginx proxy, leave BACKEND_URL empty so API requests are handled by Nginx
-        // Nginx will route /api requests to the backend service
-        BACKEND_URL: ''  // Empty for Nginx proxy - API calls will be handled by Nginx
+        // 服务器环境配置 - 指定后端服务地址
+        BACKEND_URL: process.env.BACKEND_URL || 'http://47.238.241.204:5000',  // 使用实际服务器IP
+        // 服务器环境下可能需要的其他配置
+        HOST: '0.0.0.0'
       },
       error_file: './logs/frontend-error.log',
       out_file: './logs/frontend-out.log',
